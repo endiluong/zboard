@@ -41,6 +41,7 @@
   <tr><td>🧩 <b>Save from anywhere</b></td><td>The <b>ZBoard Clipper</b> extension puts a Save button on every picture on the web, and you pick the board right there.</td></tr>
   <tr><td>🔒 <b>Yours, at home</b></td><td>One Node process with SQLite on your own machine. No account, no cloud service, nothing shared.</td></tr>
   <tr><td>☁️ <b>Backed up properly</b></td><td>Daily backups to this PC and then your own Google Drive (encrypted if you want), plus zip export of any board.</td></tr>
+  <tr><td>⌨️ <b>Also in the terminal</b></td><td>The <code>zboard</code> CLI browses, searches and edits your boards from any shell, and draws pictures right in the terminal, even over SSH.</td></tr>
   <tr><td>⚡ <b>Fast with thousands of cards</b></td><td>A 1,680-picture board still pans and zooms smoothly.</td></tr>
 </table>
 
@@ -97,6 +98,22 @@ Install it to your home screen and it opens like an app. One finger pans, two fi
 With **ZBoard Clipper**, hover a picture and click **Save** in its corner. Pick a board (type to search, Enter to save); the board you used last is at the top. Saved things wait in the board's **Saved items** panel until you drag them onto the canvas.
 
 <img src="docs/screenshots/clipper-picker.jpg" alt="The Clipper's board picker open over a picture on a web gallery" width="100%">
+
+### From the terminal
+The `zboard` CLI moves around your boards like folders: `tree`, `cd`, `ls`, `search`, and it creates, edits,
+moves and uploads too. `view` shows a picture: as a real image in iTerm2, WezTerm, kitty or Ghostty, and drawn
+with coloured blocks everywhere else, which works over SSH from your phone as well. See [CLI](#cli) for every command.
+
+<table>
+  <tr>
+    <td width="58%"><img src="docs/screenshots/cli-browse.jpg" alt="Terminal: zboard tree lists the boards, ls lists the cards on the Orc, Goblin, Troll board, and search skin lists matches across boards"></td>
+    <td width="42%"><img src="docs/screenshots/cli-view.jpg" alt="Terminal: zboard view draws a painted miniature with coloured half-block characters"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><code>tree</code>, <code>ls</code> and <code>search</code></sub></td>
+    <td align="center"><sub><code>view</code> draws the picture in the terminal</sub></td>
+  </tr>
+</table>
 
 ### Backups you can trust
 Backups go to this PC first and then Google Drive. Pictures nothing uses any more are cleaned up only when every kept backup is newer, and the confirmation says exactly what goes and that it can't be undone.
