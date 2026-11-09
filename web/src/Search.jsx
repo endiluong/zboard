@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
 import { Icon } from './icons.jsx';
 
-const TYPE_ICON = { note: 'note', todo: 'todo', image: 'image', link: 'link', board: 'board', column: 'column' };
+const TYPE_ICON = { note: 'note', todo: 'todo', image: 'image', file: 'file', link: 'link', board: 'board', column: 'column' };
 
 // Server snippets mark matches with \u0001 … \u0002.
 function Snippet({ text }) {
@@ -97,7 +97,7 @@ export default function Search({ initial, onClose }) {
                 <Icon name={TYPE_ICON[r.type] || 'note'} size={18} />
                 <div className="sr-main">
                   <div className="sr-snippet">
-                    <Snippet text={r.snippet || (r.type === 'image' ? 'Image' : r.type)} />
+                    <Snippet text={r.snippet || (r.type === 'image' ? 'Image' : r.type === 'file' ? 'File' : r.type)} />
                   </div>
                   <div className="sr-where">{r.kind === 'board' ? (r.board_title ? `Board in ${r.board_title}` : 'Board') : r.board_title}</div>
                 </div>

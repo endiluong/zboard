@@ -36,7 +36,7 @@ export async function createBackend({ sqlite3, storage, images }) {
   }
 
   const routes = [
-    ['GET', /^\/api\/me$/, () => ({ ok: true, demo: true })],
+    ['GET', /^\/api\/me$/, () => ({ ok: true, demo: true, max_upload_mb: 100 })],
     ['POST', /^\/api\/(login|logout)$/, () => ({ ok: true })],
     ['GET', /^\/api\/events$/, () => sse()],
     ['GET', /^\/api\/boards$/, () => ({ boards: store.listBoards() })],
@@ -82,6 +82,22 @@ export async function createBackend({ sqlite3, storage, images }) {
         }
         if (!files.length) throw new HttpError(400, 'No file sent');
         return json({ file: files[0], files }, 201);
+      },
+    ],
+    [
+      // A PDF's first page, drawn by the app (src/pdf.js): kept as the file's thumbnail.
+      'POST',
+      /^\/api\/files\/([^/]+)\/preview$/,
+      async (m, q, body, req) => {
+        const f = fileOr404(m[1]);
+        if (f.ext !== '.pdf' && f.mime !== 'application/pdf') throw new HttpError(400, 'Only PDFs take a preview');
+        const blob = await req.blob();
+        if (!blob.size) throw new HttpError(400, 'Send the preview as an image body');
+        const d = images ? await images.describe(blob).catch(() => null) : null;
+        await storage.putFile(f.id + ':thumb', d?.thumb || blob);
+        const pages = Math.max(1, Math.round(Number(q.get('pages'))) || 1);
+        store.setFilePreview(f.id, { width: d?.width || Number(q.get('w')) || null, height: d?.height || Number(q.get('h')) || null, color: d?.color || null, pages });
+        return { file: store.getFile(f.id) };
       },
     ],
     [

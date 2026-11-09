@@ -3142,3 +3142,447 @@ kbd {
 .color-dropper:hover {
   background: var(--bg);
 }
+
+/* ---------- file cards (PDFs and other files) ---------- */
+.file-page {
+  border-bottom: 1px solid var(--line);
+}
+.file-tile {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--c-grey);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.file-tile.is-pdf {
+  aspect-ratio: 3 / 4;
+  background: #fff linear-gradient(#f1efea 0 0) 18% 22% / 64% 6px no-repeat;
+}
+.file-ext {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+}
+.file-tile.is-pdf .file-ext {
+  color: #d93a2f;
+}
+.file-meta {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  min-width: 0;
+}
+.file-badge {
+  flex: none;
+  min-width: 30px;
+  padding: 3px 4px;
+  border-radius: 4px;
+  background: var(--ink-2);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-align: center;
+}
+.file-badge.is-pdf {
+  background: #d93a2f;
+}
+.file-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.file-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.file-facts {
+  font-size: 11.5px;
+  color: var(--ink-2);
+}
+.file-meta + .caption,
+.file-meta + .caption-input,
+.file-meta + .caption-add {
+  padding-top: 0;
+}
+.card.has-bg .file-name,
+.card.has-bg .file-facts {
+  color: inherit;
+}
+
+/* ---------- PDF reader ---------- */
+.pdf-reader {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  background: #3b3a37;
+  color: #fff;
+}
+.pdf-reader.pdf-loading {
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  opacity: 0.9;
+}
+.pdf-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: calc(6px + env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 6px max(8px, env(safe-area-inset-left));
+  background: #23221f;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.pdf-btn,
+.pdf-pct {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+.pdf-pct {
+  min-width: 52px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.pdf-btn:hover,
+.pdf-pct:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.pdf-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  background: transparent;
+}
+.pdf-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pdf-count {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+  font-variant-numeric: tabular-nums;
+}
+.pdf-goto {
+  width: 42px;
+  height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  text-align: center;
+  font: inherit;
+  font-size: 16px; /* 16 px: iOS doesn't zoom the page when it's focused */
+}
+.pdf-zoom {
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+.pdf-scroll {
+  flex: 1;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+}
+.pdf-doc {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: max-content;
+  min-width: 100%;
+}
+.pdf-page {
+  position: relative;
+  flex: none;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+}
+.pdf-page .react-pdf__Page,
+.pdf-page canvas {
+  display: block;
+}
+.pdf-page .react-pdf__Page {
+  position: relative; /* drawn over the spinner below it */
+}
+/* Loading spinner: while a PDF opens, and on each page until it is drawn. */
+.pdf-spin {
+  display: block;
+  width: 34px;
+  height: 34px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.18);
+  border-top-color: #fff;
+  animation: pdf-spin 0.8s linear infinite;
+}
+.pdf-page-spin {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  margin: -17px 0 0 -17px;
+  border-color: rgba(0, 0, 0, 0.1);
+  border-top-color: rgba(0, 0, 0, 0.45);
+}
+@keyframes pdf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pdf-spin {
+    animation-duration: 2.4s;
+  }
+}
+.pdf-msg {
+  margin: 18vh auto 0;
+  max-width: 320px;
+  text-align: center;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.8);
+}
+.pdf-slow {
+  margin-top: 14px;
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.65);
+}
+.pdf-slow a {
+  color: #fff;
+  font-weight: 600;
+}
+@media (max-width: 600px) {
+  .pdf-pct {
+    display: none;
+  }
+  .pdf-scroll {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+}
+
+/* ---------- uploads in progress: a placeholder card with the file's type and a progress bar ---------- */
+.card-uploading {
+  pointer-events: auto;
+  overflow: hidden;
+  animation: upl-in 0.2s ease-out;
+}
+@keyframes upl-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+.upl-tile {
+  aspect-ratio: 4 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--c-grey);
+  color: var(--ink-2);
+}
+.upl-tile.kind-pdf {
+  background: #fdf0ee;
+  color: #d93a2f;
+}
+.upl-tile.kind-image {
+  background: #eef3fd;
+  color: var(--accent);
+}
+.upl-doc {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  animation: upl-bob 1.6s ease-in-out infinite;
+}
+.upl-doc b {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+@keyframes upl-bob {
+  50% {
+    transform: translateY(-4px);
+  }
+}
+.upl-meta {
+  padding: 9px 12px 11px;
+}
+.upl-name {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.upl-bar {
+  height: 5px;
+  margin: 7px 0 5px;
+  border-radius: 99px;
+  background: var(--line);
+  overflow: hidden;
+}
+.upl-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.2s linear;
+}
+.kind-pdf + .upl-meta .upl-bar i {
+  background: #d93a2f;
+}
+.upl-facts {
+  font-size: 11.5px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.card-uploading.failed .upl-bar i {
+  background: var(--danger);
+}
+.card-uploading.failed .upl-facts {
+  color: var(--danger);
+}
+.upl-cancel {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+@media (pointer: coarse) {
+  .upl-cancel {
+    width: 34px;
+    height: 34px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .upl-doc,
+  .card-uploading {
+    animation: none;
+  }
+}
+
+/* Upload states (UploadCard.jsx): paused and waiting are amber; failed is red with a ✕ in the middle. */
+.card-uploading.st-paused .upl-tile,
+.card-uploading.st-waiting .upl-tile {
+  background: #fdf3e1;
+  color: #8a5a0b;
+}
+.card-uploading.st-paused .upl-bar i,
+.card-uploading.st-waiting .upl-bar i {
+  background: #c98a1a;
+}
+.card-uploading.st-paused .upl-doc,
+.card-uploading.st-waiting .upl-doc {
+  animation: none;
+}
+.card-uploading.st-resuming .upl-doc svg {
+  animation: upl-spin 1.2s linear infinite;
+}
+@keyframes upl-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.card-uploading.st-failed {
+  background: #fdeceb;
+  border-color: #e24b4a;
+}
+.card-uploading.st-failed .upl-tile {
+  background: transparent;
+}
+.card-uploading.st-failed .upl-meta {
+  border-top: 1px solid #f3b4b2;
+}
+.card-uploading.st-failed .upl-name {
+  color: #7a1f1f;
+}
+.upl-fail-x {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #e24b4a;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.upl-reason {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #b42d2d;
+}
+.card-uploading.tappable {
+  cursor: pointer;
+}
+.card-uploading.tappable:hover {
+  border-color: #c93a32;
+}
+.card-uploading.st-failed .upl-cancel {
+  background: #fff;
+  color: #b42d2d;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-uploading.st-resuming .upl-doc svg {
+    animation: none;
+  }
+}
+
+/* A card type this copy of ZBoard doesn't know (made by a newer version). */
+.card-unknown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 180px;
+  min-height: 120px;
+  padding: 16px;
+  color: var(--muted, #6b6a66);
+  text-align: center;
+  font-size: 13px;
+}
+.pdf-msg a {
+  color: #fff;
+  font-weight: 600;
+}

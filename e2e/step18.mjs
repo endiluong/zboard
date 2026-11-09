@@ -140,7 +140,7 @@ check(bar.labels.join() === 'Note,Image,Board,Draw,Camera,Undo,More things to ad
 await page.locator('[aria-label="More things to add"]').tap();
 await page.waitForSelector('.action-pop .pop-row');
 const extras = await page.locator('.action-pop .pop-row').allTextContents();
-check(extras.join() === 'To-do,Link,Color,Column', 'More lists To-do, Link, Color and Column', extras.join());
+check(extras.join() === 'To-do,Link,File,Color,Column', 'More lists To-do, Link, File, Color and Column', extras.join());
 await page.locator('.action-pop .pop-row', { hasText: 'To-do' }).tap();
 await sleep(800);
 check((await api('GET', `/api/boards/${boardId}`)).cards.some((c) => c.type === 'todo'), 'a to-do added from More lands on the board');

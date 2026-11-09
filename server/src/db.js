@@ -2,7 +2,7 @@
 import crypto from 'node:crypto';
 import { openDatabase } from './sqlite.js';
 
-export const CARD_TYPES = new Set(['note', 'todo', 'image', 'link', 'board', 'column', 'drawing', 'color']);
+export const CARD_TYPES = new Set(['note', 'todo', 'image', 'link', 'board', 'column', 'drawing', 'color', 'file']);
 export const newId = () => crypto.randomBytes(9).toString('base64url');
 export const isId = (s) => typeof s === 'string' && /^[A-Za-z0-9_-]{6,64}$/.test(s);
 
@@ -246,6 +246,7 @@ export function createStore(file) {
   if (!fileCols.includes('alpha')) db.exec('ALTER TABLE files ADD COLUMN alpha INTEGER');
   if (!fileCols.includes('color')) db.exec('ALTER TABLE files ADD COLUMN color TEXT');
   if (!fileCols.includes('unused_since')) db.exec('ALTER TABLE files ADD COLUMN unused_since INTEGER'); // see cleanup.js
+  if (!fileCols.includes('pages')) db.exec('ALTER TABLE files ADD COLUMN pages INTEGER'); // PDFs
   const now = () => Date.now();
 
   if (!db.prepare('SELECT 1 FROM boards WHERE id = ?').get('root')) {
@@ -321,8 +322,8 @@ export function createStore(file) {
     db.prepare('DELETE FROM card_tags WHERE card_id = ?').run(id);
     const c = getCard(id);
     if (!c) return;
-    // Images are also found by their file name.
-    const name = c.type === 'image' && c.data?.fileId ? db.prepare('SELECT name FROM files WHERE id = ?').get(c.data.fileId)?.name : null;
+    // Pictures and files are also found by their file name.
+    const name = (c.type === 'image' || c.type === 'file') && c.data?.fileId ? db.prepare('SELECT name FROM files WHERE id = ?').get(c.data.fileId)?.name : null;
     const text = [cardText(c), name, ...(c.data?.labels || [])].filter(Boolean).join('\n');
     if (text) db.prepare("INSERT INTO search_fts (ref, board_id, kind, text) VALUES (?, ?, 'card', ?)").run(id, c.board_id, text);
     for (const tag of tagsOf(c)) db.prepare('INSERT OR IGNORE INTO card_tags (card_id, board_id, tag) VALUES (?, ?, ?)').run(id, c.board_id, tag);
@@ -751,6 +752,9 @@ export function createStore(file) {
     db.prepare(insertSql('files', ['id', 'name', 'mime', 'ext', 'size', 'width', 'height', 'sha256', 'display_ext', 'alpha', 'color', 'created_at'])).run({ alpha: null, color: null, ...f });
   const setFileAlpha = (id, alpha) => db.prepare('UPDATE files SET alpha = ? WHERE id = ?').run(alpha ? 1 : 0, id);
   const setFileColor = (id, color) => db.prepare('UPDATE files SET color = ? WHERE id = ?').run(color, id);
+  // A PDF's first page, drawn by the browser (see web/src/pdf.js): its size and the page count.
+  const setFilePreview = (id, { width, height, color, pages }) =>
+    db.prepare('UPDATE files SET width = ?, height = ?, color = ?, pages = ? WHERE id = ?').run(width, height, color, pages, id);
   const getFile = (id) => db.prepare('SELECT * FROM files WHERE id = ?').get(id) ?? null;
 
   return {
@@ -773,6 +777,7 @@ export function createStore(file) {
     insertFile,
     setFileAlpha,
     setFileColor,
+    setFilePreview,
     getFile,
     getClip,
     createClip,

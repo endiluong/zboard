@@ -15,6 +15,7 @@ import { importMilanote } from './milanote.js';
 import { createCleanup } from './cleanup.js';
 import { createBackupPlan } from './plan.js';
 import { createDrive, createLocalBackups } from './backup.js';
+import { mountUploads } from './uploads.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const PORT = Number(process.env.PORT) || 3000;
@@ -115,7 +116,7 @@ app.use(['/api', '/files'], (req, res, next) => {
 });
 
 // Successful writes mark the data dirty for the Google Drive backup (uploaded once edits stop).
-const NOT_DATA = /^\/(logout|token|backup|drive|link-preview)/;
+const NOT_DATA = /^\/(logout|token|backup|drive|link-preview|uploads)/; // upload pieces: the card made after counts
 app.use('/api', (req, res, next) => {
   if (req.method !== 'GET' && !NOT_DATA.test(req.path)) {
     res.on('finish', () => {
@@ -129,7 +130,7 @@ app.post('/api/logout', (req, res) => {
   res.clearCookie(COOKIE);
   res.json({ ok: true });
 });
-app.get('/api/me', (req, res) => res.json({ ok: true }));
+app.get('/api/me', (req, res) => res.json({ ok: true, max_upload_mb: MAX_UPLOAD_MB }));
 
 app.get('/api/token', (req, res) => res.json({ token: apiToken }));
 app.post('/api/token/rotate', (req, res) => {
@@ -324,6 +325,9 @@ app.post('/api/upload', upload.array('file', 50), async (req, res) => {
   res.status(201).json({ file: files[0], files });
 });
 
+// Big files: sent in pieces that survive a dropped connection or a closed page (see uploads.js).
+mountUploads(app, { dir: path.join(DATA_DIR, 'uploads'), tmpDir: DIRS.tmp, maxBytes: MAX_UPLOAD_MB * 1024 * 1024, storeUpload, log: (m) => console.log(`[${new Date().toISOString()}] ${m}`) });
+
 // ---- Milanote import (pictures go through /api/upload first; see milanote.js) ----
 app.post('/api/import/milanote', (req, res) => {
   const out = importMilanote(store, req.body ?? {}, { parentId: req.body?.parentId || 'root', newId });
@@ -494,6 +498,26 @@ app.get('/files/:id/thumb', (req, res) => {
   const f = fileOr404(req.params.id);
   if (!fs.existsSync(thumbPath(f.id))) throw new HttpError(404, 'No thumbnail for this file');
   res.sendFile(thumbPath(f.id), { headers: IMMUTABLE });
+});
+
+// A PDF's preview: the browser draws the first page with pdf.js (the server has no PDF renderer) and
+// sends it here as a picture. It becomes the file's thumbnail, so cards show it like any image.
+const isPdf = (f) => f.ext === '.pdf' || f.mime === 'application/pdf';
+app.post('/api/files/:id/preview', express.raw({ type: 'image/*', limit: '10mb' }), async (req, res) => {
+  const f = fileOr404(req.params.id);
+  if (!isPdf(f)) throw new HttpError(400, 'Only PDFs take a preview');
+  if (!Buffer.isBuffer(req.body) || !req.body.length) throw new HttpError(400, 'Send the preview as an image body');
+  let meta;
+  try {
+    meta = await sharp(req.body).metadata();
+    await sharp(req.body).resize(800, 800, { fit: 'inside', withoutEnlargement: true }).webp({ quality: 80 }).toFile(thumbPath(f.id));
+  } catch (e) {
+    throw new HttpError(415, `Can't read the preview: ${e.message}`);
+  }
+  for (const p of [miniPath(f.id), microPath(f.id)]) fs.rmSync(p, { force: true });
+  const pages = Math.max(1, Math.min(100000, Math.round(Number(req.query.pages)) || 1));
+  store.setFilePreview(f.id, { width: meta.width, height: meta.height, color: await mainColor(thumbPath(f.id)), pages });
+  res.json({ file: store.getFile(f.id) });
 });
 
 // Smaller copies made from the thumbnail on first request and kept: 256 px "mini" for zoomed-out
@@ -849,9 +873,13 @@ async function rebuildMissingThumbs() {
     }
   }
   if (n) log(`Rebuilt ${n} missing thumbnail(s)`);
+  // A PDF's preview comes from a browser: forget a lost one so the next browser to show it draws it again.
+  for (const f of store.allFiles()) {
+    if (isPdf(f) && f.width && !fs.existsSync(thumbPath(f.id))) store.setFilePreview(f.id, { width: null, height: null, color: null, pages: f.pages });
+  }
   // Files uploaded before cut-out detection existed.
   for (const f of store.allFiles()) {
-    if (f.alpha != null || !fs.existsSync(thumbPath(f.id))) continue;
+    if (f.alpha != null || isPdf(f) || !fs.existsSync(thumbPath(f.id))) continue; // a PDF's page preview is never a cut-out
     try {
       const src = fs.existsSync(displayPath(f)) ? displayPath(f) : thumbPath(f.id);
       store.setFileAlpha(f.id, await hasTransparency(await sharp(src).metadata(), thumbPath(f.id)));

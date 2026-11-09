@@ -10,9 +10,11 @@
   },
   "dependencies": {
     "dompurify": "^3.4.17",
+    "pdfjs-dist": "5.4.296",
     "perfect-freehand": "1.2.2",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-pdf": "10.5.0"
   },
   "devDependencies": {
     "@sqlite.org/sqlite-wasm": "3.53.4-build2",

@@ -93,7 +93,7 @@ export default function FarSnapshot({ active, scale, worldRef, rects, cards, fil
           g.fillRect(r.x, r.y, r.w, sw ? sw.offsetHeight : r.h * 0.7);
           continue;
         }
-        const img = el.querySelector(c.type === 'image' ? '.img-wrap img' : '.link-img, .video-frame img');
+        const img = el.querySelector(c.type === 'image' || c.type === 'file' ? '.img-wrap img' : '.link-img, .video-frame img');
         const wrap = img?.closest('.img-wrap, .video-frame') || img;
         if (!img || !wrap) continue;
         const wx = r.x + (wrap.offsetParent === el ? wrap.offsetLeft : 0);

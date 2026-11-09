@@ -37,8 +37,35 @@ if (DEMO) {
 for (const type of ['gesturestart', 'gesturechange']) document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
 
 // The service worker only runs from a build (it needs HTTPS or localhost).
+// Updates: the page opens from the worker's saved copy, so a new ZBoard on the server arrives as a
+// new worker. A phone app is rarely closed for real (it sleeps in the background), so it would keep
+// running the old version for days. So: check for a new version every time the app comes back to
+// the front, and reload into it when that is harmless: right after opening or coming back (nothing
+// typed yet). Otherwise it waits for the next time the app is brought back. Big uploads carry on
+// after the reload (uploads.js).
 if (import.meta.env.PROD && !DEMO && 'serviceWorker' in navigator) {
+  const sw = navigator.serviceWorker;
+  const hadController = !!sw.controller; // false on the very first visit: nothing old to replace
+  let frontAt = Date.now();
+  let pending = false;
+  const reload = () => {
+    if (reload.done) return;
+    reload.done = true;
+    location.reload();
+  };
+  sw.addEventListener('controllerchange', () => {
+    if (!hadController) return;
+    if (!document.hidden && Date.now() - frontAt < 10000) reload();
+    else pending = true;
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    frontAt = Date.now();
+    if (pending) reload();
+    else sw.getRegistration().then((r) => r?.update()).catch(() => {});
+  });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => {});
+    frontAt = Date.now();
+    sw.register('/sw.js', { updateViaCache: 'none' }).catch(() => {});
   });
 }

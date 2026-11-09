@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { api, openEvents, uploadFiles } from './api.js';
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { api, openEvents, uploadFile, uploadFiles, uploadLimit } from './api.js';
+import { PIECE, cancelUpload, getJobs, onFinished, repickUpload, resumeUploads, retryUpload, startUpload, subscribe } from './uploads.js';
 import { bootDone } from './boot.js';
 import { CardView, SafeImg, youtubeId } from './Cards.jsx';
 import ContextMenu from './ContextMenu.jsx';
@@ -13,6 +14,17 @@ import { inkBounds, mapStrokes } from './ink.js';
 import SavedPanel, { CLIP_DRAG_TYPE } from './SavedPanel.jsx';
 import { cachedBoard, fetchBoard, prefetchBoard, remember } from './boardCache.js';
 import { Icon } from './icons.jsx';
+import { PDF_SUPPORTED, fileUrl, isPdf, makePdfPreview } from './pdf.js';
+import { formatBytes } from './Menu.jsx';
+import { DEMO } from './demo.js';
+import UploadCard from './UploadCard.jsx';
+
+// PDFs up to this size get their preview drawn from the picked file itself; bigger ones from the
+// server copy, read in pieces (a phone can't comfortably hold 80 MB in memory).
+const PREVIEW_FROM_MEMORY = 20 * 1024 * 1024;
+
+// The PDF reader and pdf.js load only when a PDF is opened.
+const PdfReader = lazy(() => import('./PdfReader.jsx'));
 import { COLORS, DEFAULT_W, byId, clamp, htmlText, isImageFile, isUrl, sortBetween, textToHtml, uid } from './util.js';
 
 const MIN_S = 0.1;
@@ -47,6 +59,7 @@ const TOOLS = [
   { kind: 'todo', label: 'To-do', icon: 'todo', extra: true },
   { kind: 'link', label: 'Link', icon: 'link', extra: true },
   { kind: 'image', label: 'Image', icon: 'image' },
+  ...(DEMO ? [] : [{ kind: 'file', label: 'File', icon: 'file', extra: true }]), // no PDFs or files in the demo
   { kind: 'color', label: 'Color', icon: 'swatch', extra: true },
   { kind: 'board', label: 'Board', icon: 'board' },
   { kind: 'column', label: 'Column', icon: 'column', extra: true },
@@ -100,6 +113,9 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
   const [tempArrow, setTempArrow] = useState(null);
   const [ghost, setGhost] = useState(null);
   const [lightbox, setLightbox] = useState(null);
+  const [reader, setReader] = useState(null); // fileId of the PDF open in the reader
+  const [uploads, setUploads] = useState([]); // files on their way up, shown as placeholder cards
+  const uploadAborts = useRef(new Map());
   const [toast, setToast] = useState(null);
   const [colorOpen, setColorOpen] = useState(false);
   const [coverFor, setCoverFor] = useState(null); // board card whose cover picker is open
@@ -641,22 +657,117 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
   );
 
   // ---------- adding content ----------
+  // A PDF's first page: drawn from the file just picked while it is small enough to hold in memory
+  // (fast, nothing downloaded again); a bigger one is read from the server in pieces instead.
+  const previewPdf = useCallback((f, picked) => {
+    makePdfPreview(f.id, picked && picked.size <= PREVIEW_FROM_MEMORY ? picked : undefined).then((nf) => nf && setFiles((m) => ({ ...m, [nf.id]: nf })));
+  }, []);
+
+  // Pictures become image cards; any other file (a PDF, a ZIP…) a file card. Files too big for the
+  // server are turned away before anything is sent. On the board, each file uploads in the background
+  // as a placeholder card with its type and a progress bar (× cancels it), and turns into the real
+  // card where it stood once it's stored; the board stays usable meanwhile.
   const addImages = useCallback(
     async (list, at) => {
-      const imgs = [...list].filter(isImageFile);
-      if (!imgs.length) return notify('Only images can be added to the board');
-      notify(`Uploading ${imgs.length} image${imgs.length > 1 ? 's' : ''}…`);
-      try {
-        const made = await uploadFiles(imgs);
-        setFiles((f) => ({ ...f, ...byId(made) }));
-        setToast(null);
-        await createCards(made.map((f, i) => ({ type: 'image', x: at.x + (i % 4) * 260, y: at.y + Math.floor(i / 4) * 260, data: { fileId: f.id, caption: '' }, ...(at.column_id ? { column_id: at.column_id, sort: (at.sort ?? 0) + i * 0.001 } : {}) })));
-      } catch (e) {
-        notify(e);
+      let all = [...list].filter(Boolean);
+      if (!all.length) return;
+      if (DEMO && all.some((f) => !isImageFile(f))) {
+        notify("PDFs and other files can't be uploaded in the demo. Host your own ZBoard to use them.");
+        all = all.filter(isImageFile);
+        if (!all.length) return;
       }
+      const limit = await uploadLimit();
+      const tooBig = all.filter((f) => f.size > limit);
+      if (tooBig.length) {
+        const f = tooBig[0];
+        notify(`"${f.name || 'File'}" is ${formatBytes(f.size)}; the largest upload is ${formatBytes(limit)}${tooBig.length > 1 ? ` (${tooBig.length} files are too big)` : ''}.`);
+        all = all.filter((f) => f.size <= limit);
+        if (!all.length) return;
+      }
+      const cardFor = (f, extra) => ({ type: f.width && !isPdf(f) ? 'image' : 'file', data: { fileId: f.id, caption: '' }, ...extra });
+
+      // Into a column: one go, with a message (a column has no free spot for placeholders).
+      if (at.column_id) {
+        const pics = all.filter(isImageFile).length;
+        notify(`Uploading ${all.length} ${pics === all.length ? 'image' : 'file'}${all.length > 1 ? 's' : ''}…`);
+        try {
+          const made = await uploadFiles(all);
+          setFiles((f) => ({ ...f, ...byId(made) }));
+          setToast(null);
+          await createCards(made.map((f, i) => cardFor(f, { column_id: at.column_id, sort: (at.sort ?? 0) + i * 0.001 })));
+          made.forEach((f, i) => isPdf(f) && previewPdf(f, all[i]));
+        } catch (e) {
+          notify(e);
+        }
+        return;
+      }
+
+      const spots = all.map((file, i) => ({ file, x: at.x + (i % 4) * 260, y: at.y + Math.floor(i / 4) * 260 }));
+      // Bigger than one piece: resumable (uploads.js), kept going across boards, closed pages and lost
+      // connections. Small ones go up in one request.
+      const big = DEMO ? [] : spots.filter((s) => s.file.size > PIECE);
+      for (const s of big) startUpload(s.file, { boardId, x: s.x, y: s.y }).catch((e) => notify(`${s.file.name}: ${e.message}`));
+      const jobs = spots
+        .filter((s) => !big.includes(s))
+        .map(({ file, x, y }) => ({
+          key: uid(),
+          file,
+          name: file.name || 'pasted.png',
+          kind: isImageFile(file) ? 'image' : isPdf({ name: file.name, mime: file.type }) ? 'pdf' : 'file',
+          x,
+          y,
+          sent: 0,
+          total: file.size,
+        }));
+      if (!jobs.length) return;
+      setUploads((u) => [...u, ...jobs.map(({ file, ...j }) => j)]);
+      const patch = (key, p) => setUploads((u) => u.map((j) => (j.key === key ? { ...j, ...p } : j)));
+      const drop = (key) => setUploads((u) => u.filter((j) => j.key !== key));
+      const run = async (job) => {
+        const req = uploadFile(job.file, (sent, total) => patch(job.key, { sent, total }));
+        uploadAborts.current.set(job.key, req.abort);
+        try {
+          const f = await req;
+          setFiles((m) => ({ ...m, [f.id]: f }));
+          drop(job.key);
+          await createCards([cardFor(f, { x: job.x, y: job.y })]);
+          if (isPdf(f)) previewPdf(f, job.file);
+        } catch (e) {
+          if (e.cancelled) return drop(job.key);
+          patch(job.key, { error: e.message });
+          notify(`${job.name}: ${e.message}`);
+          setTimeout(() => drop(job.key), 5000);
+        } finally {
+          uploadAborts.current.delete(job.key);
+        }
+      };
+      // Two at a time: big files don't hold up the small ones for long, and the link isn't swamped.
+      const queue = [...jobs];
+      await Promise.all([0, 1].map(async () => {
+        while (queue.length) await run(queue.shift());
+      }));
     },
-    [createCards, notify]
+    [createCards, notify, previewPdf, boardId]
   );
+
+  // Big uploads (uploads.js): this board's are shown as placeholders; a finished one becomes its card.
+  const [bigUploads, setBigUploads] = useState(getJobs);
+  useEffect(() => {
+    resumeUploads();
+    const offJobs = subscribe(setBigUploads);
+    const offDone = onFinished(({ card, file, movedHome, picked }) => {
+      setFiles((m) => ({ ...m, [file.id]: file }));
+      if (card.board_id === boardId) applyCards([card]);
+      if (movedHome) notify(`${file.name}: its board was deleted, so it was put on Home.`);
+      if (isPdf(file)) previewPdf(file, picked);
+    });
+    return () => {
+      offJobs();
+      offDone();
+    };
+  }, [boardId, applyCards, notify, previewPdf]);
+  const repickFor = useRef(null);
+  const repickInput = useRef(null);
 
   const addImageUrl = useCallback(
     async (url, at, extra = {}) => {
@@ -683,8 +794,9 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
 
   const addTool = useCallback(
     (kind, at) => {
-      if (kind === 'image') {
+      if (kind === 'image' || kind === 'file') {
         fileInput.current.dataset.at = JSON.stringify(at);
+        fileInput.current.accept = kind === 'image' ? 'image/*' : '';
         fileInput.current.click();
         return;
       }
@@ -862,6 +974,10 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
         const r = await api('GET', `/api/files/${fileId}/info`).catch(() => null);
         if (r) setFiles((f) => ({ ...f, [fileId]: r.file }));
       },
+      ensurePdfPreview: async (fileId) => {
+        const nf = await makePdfPreview(fileId);
+        if (nf) setFiles((f) => ({ ...f, [fileId]: nf }));
+      },
     }),
     [patchCards, deleteCards, setLink, stopEdit, notify, setCover]
   );
@@ -898,6 +1014,18 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
       location.hash = `#/b/${c.data.boardId}`;
     } else if (c.type === 'link' && c.data.url) window.open(c.data.url, '_blank', 'noopener');
     else if (c.type === 'image' && c.data.fileId) setLightbox(c.data.fileId);
+    else if (c.type === 'file' && c.data.fileId) {
+      const f = S.current.files[c.data.fileId];
+      // A browser that can't run pdf.js gets the PDF in its own viewer, in a new window (over the app
+      // with a Done button when ZBoard runs from the home screen). The reader is never mounted then,
+      // so nothing flashes first.
+      if (isPdf(f) && PDF_SUPPORTED) return setReader(c.data.fileId);
+      if (isPdf(f)) return void window.open(fileUrl(c.data.fileId), '_blank', 'noopener');
+      const a = document.createElement('a');
+      a.href = fileUrl(c.data.fileId);
+      a.download = f?.name || 'file';
+      a.click();
+    }
   }, [openDrawing, onInfo]);
 
   const startEdit = useCallback((id) => {
@@ -1221,10 +1349,10 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
     const moveItems = boardList.length
       ? [{ label: home?.title || 'Home', icon: 'home', disabled: boardId === 'root', onClick: () => moveToBoard(ids, 'root'), submenu: tree('root') }]
       : [{ label: 'Loading…', disabled: true }];
-    const opens = single && ['board', 'link', 'image'].includes(single.type);
+    const opens = single && ['board', 'link', 'image', 'file'].includes(single.type);
     return [
       single && { label: opens ? 'Open' : 'Edit', icon: opens ? 'open' : 'edit', shortcut: opens ? 'Dbl-click' : 'Enter', onClick: () => (opens ? openCard(single) : startEdit(single.id)) },
-      single && opens && single.type !== 'image' && { label: single.type === 'board' ? 'Rename' : 'Edit link', icon: 'edit', shortcut: 'Enter', onClick: () => startEdit(single.id) },
+      single && opens && single.type !== 'image' && single.type !== 'file' && { label: single.type === 'board' ? 'Rename' : 'Edit link', icon: 'edit', shortcut: 'Enter', onClick: () => startEdit(single.id) },
       single?.type === 'board' && { label: 'Change cover', icon: 'palette', onClick: () => setCoverFor(single.id) },
       single?.type === 'drawing' && { label: 'Edit drawing', icon: 'draw', shortcut: 'Dbl-click', onClick: () => openDrawing(single) },
       single?.type === 'image' && !single.column_id && { label: single.data.ink ? 'Edit drawing on image' : 'Draw on image', icon: 'draw', onClick: () => openInk(single) },
@@ -1606,7 +1734,7 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
         if (lt && lt.id === g.card && now - lt.t < 350) {
           lastTap.current = null;
           const c = S.current.cards[g.card];
-          if (c && (c.type === 'board' || c.type === 'image' || c.type === 'drawing' || (c.type === 'link' && c.data.url))) openCard(c);
+          if (c && (c.type === 'board' || c.type === 'image' || c.type === 'file' || c.type === 'drawing' || (c.type === 'link' && c.data.url))) openCard(c);
           else if (c) startEdit(c.id);
         } else {
           lastTap.current = { id: g.card, t: now };
@@ -1651,7 +1779,7 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
         if (!c || S.current.editing === c.id) return;
         if (e.target.closest('input, textarea, button, a')) return;
         if (c.type === 'board' && e.target.closest('.board-title')) startEdit(c.id); // double-click the name to rename
-        else if (c.type === 'board' || c.type === 'image' || c.type === 'drawing') openCard(c);
+        else if (c.type === 'board' || c.type === 'image' || c.type === 'file' || c.type === 'drawing') openCard(c);
         else if (c.type === 'link' && c.data.url) openCard(c);
         else startEdit(c.id);
         return;
@@ -1680,6 +1808,7 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
     const down = (e) => {
       if (S.current.drawing) return; // the drawing layer has its own keys
       const typing = e.target.closest?.('input, textarea, [contenteditable="true"]');
+      if (reader) return; // the reader has its own keys
       if (e.key === 'Escape') {
         if (lightbox) return setLightbox(null);
         if (typing) {
@@ -1792,7 +1921,7 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
       window.removeEventListener('copy', copyOrCut);
       window.removeEventListener('cut', copyOrCut);
     };
-  }, [lightbox, undo, duplicate, deleteArrow, deleteCards, startEdit, zoomCenter, fitAll, selectAll, copySelection, pasteClip, pointerWorld, addImages, addLink, addText]);
+  }, [lightbox, reader, undo, duplicate, deleteArrow, deleteCards, startEdit, zoomCenter, fitAll, selectAll, copySelection, pasteClip, pointerWorld, addImages, addLink, addText]);
 
   const onDragOver = (e) => {
     const types = [...e.dataTransfer.types];
@@ -2089,6 +2218,9 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
       else if (t === 'image') {
         if (!single.column_id) out.push(act('Draw on', 'draw', () => openInk(single), { aria: 'Draw on image', tip: 'Draw on image' }));
         out.push(act('Edit', 'crop', () => setImgEdit(single.id), { aria: 'Edit image', tip: 'Crop and rotate' }), act('Caption', 'caption', () => actions.editCard(single.id), { tip: 'Caption (searchable)' }));
+      } else if (t === 'file') {
+        const pdf = isPdf(files[single.data.fileId]);
+        out.push(act(pdf ? 'Read' : 'Download', pdf ? 'open' : 'download', () => openCard(single), { tip: pdf ? 'Read (double-click)' : 'Download' }), act('Caption', 'caption', () => actions.editCard(single.id), { tip: 'Caption (searchable)' }));
       } else if (t === 'drawing') out.push(act('Edit', 'draw', () => openDrawing(single), { aria: 'Edit drawing', tip: 'Edit drawing (double-click)' }));
       else out.push(act('Edit', 'edit', () => startEdit(single.id), { tip: 'Edit (Enter)' }));
     }
@@ -2176,6 +2308,11 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
             replaceInput.current.click();
           })
         );
+      }
+      if (single?.type === 'file') {
+        const f = files[single.data.fileId];
+        if (isPdf(f)) rows.push(row('Read', 'open', () => openCard(single)));
+        rows.push(row('Download', 'download', null, { href: fileUrl(single.data.fileId), download: f?.name || 'file' }));
       }
       rows.push(
         row('Duplicate', 'duplicate', () => duplicate(ids), { keys: 'Ctrl+D' }),
@@ -2296,9 +2433,31 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
           <FarSnapshot active={snap} scale={settledS} worldRef={worldRef} rects={rects} cards={cards} files={files} skip={snapSkip} version={rectsVersion} />
           {arrowLayer}
           {cardLayer}
+          {uploads.map((u) => (
+            <UploadCard
+              key={u.key}
+              u={{ ...u, id: u.key, status: u.error ? 'failed' : 'uploading', message: u.error }}
+              onCancel={() => uploadAborts.current.get(u.key)?.()}
+            />
+          ))}
+          {bigUploads
+            .filter((u) => u.board_id === boardId)
+            .map((u) => (
+              <UploadCard
+                key={u.id}
+                u={u}
+                onCancel={() => cancelUpload(u.id)}
+                onRemove={() => cancelUpload(u.id)}
+                onFailedTap={() => {
+                  if (u.reason === 'space' && retryUpload(u.id)) return;
+                  repickFor.current = u.id;
+                  repickInput.current.click();
+                }}
+              />
+            ))}
         </div>
 
-        {loaded && !topCards.length && (
+        {loaded && !topCards.length && !uploads.length && !bigUploads.some((u) => u.board_id === boardId) && (
           <div className="empty-hint">
             Add a card from the left toolbar, drop images here, or paste a link.
           </div>
@@ -2383,6 +2542,12 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
         />
       )}
 
+      {reader && files[reader] && (
+        <Suspense fallback={<div className="pdf-reader pdf-loading">Opening…</div>}>
+          <PdfReader file={files[reader]} onClose={() => setReader(null)} />
+        </Suspense>
+      )}
+
       {lightbox && (
         <div className="lightbox" onClick={() => setLightbox(null)}>
           <SafeImg src={`/files/${lightbox}`} alt="" />
@@ -2427,6 +2592,17 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
         onChange={(e) => {
           const at = JSON.parse(e.target.dataset.at || 'null') || centerWorld();
           addImages(e.target.files, at);
+          e.target.value = '';
+        }}
+      />
+      {/* A file chosen for a failed upload card: the same file finishes it, another starts over there. */}
+      <input
+        ref={repickInput}
+        type="file"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files[0];
+          if (f && repickFor.current) repickUpload(repickFor.current, f).catch(notify);
           e.target.value = '';
         }}
       />

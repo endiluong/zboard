@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 import react from '@vitejs/plugin-react';
+import { pdfAssets } from '../pdf-assets.mjs';
 
 const web = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = path.join(web, 'dist-demo');
@@ -36,7 +37,7 @@ export async function buildDemo({ quiet = false } = {}) {
     base,
     configFile: false,
     logLevel,
-    plugins: [react()],
+    plugins: [react(), pdfAssets()],
     define: { __ZB_DEMO__: 'true' },
     build: { outDir: out, emptyOutDir: true },
   });

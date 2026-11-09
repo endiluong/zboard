@@ -4,6 +4,9 @@
 (() => {
   if (window.__zboardHover) return;
   window.__zboardHover = true;
+  // Never on ZBoard itself, whatever address it is opened at (localhost, Tailscale, the demo):
+  // its page says so in web/index.html.
+  if (document.querySelector('meta[name="application-name"][content="ZBoard"]')) return;
 
   const MIN = 120; // smaller images (icons, avatars) get no button
   let enabled = true;

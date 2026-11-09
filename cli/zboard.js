@@ -257,6 +257,8 @@ function titleOf(card, files = {}) {
       return d.title || d.url || 'Link';
     case 'image':
       return d.caption || files[d.fileId]?.name || 'Image';
+    case 'file':
+      return d.caption || files[d.fileId]?.name || 'File';
     case 'column':
       return d.title || 'Column';
     case 'drawing':

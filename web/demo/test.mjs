@@ -84,6 +84,15 @@ r = await call(b, 'POST', '/api/upload?name=IMG%200001.png', new Blob([png], { t
 check(r.status === 201 && r.body.file?.name === 'IMG 0001.png' && r.body.file.mime === 'image/png' && r.body.file.size === png.length, 'pictures sent as plain bytes upload too (Safari)', JSON.stringify(r.body));
 r = await call(b, 'GET', `/files/${file.id}/thumb`);
 check(r.status === 200 && r.body.size === png.length, 'and are served back (the original when there is no preview)');
+r = await call(b, 'POST', '/api/upload?name=guide.pdf', new Blob(['%PDF-1.4\n%%EOF\n'], { type: 'application/pdf' }));
+const pdf = r.body.file;
+r = await call(b, 'POST', '/api/boards/root/cards', { type: 'file', x: 0, y: 0, data: { fileId: pdf.id } });
+check(r.status === 201 && r.body.card.type === 'file', 'a PDF becomes a file card', JSON.stringify(r.body));
+r = await call(b, 'POST', `/api/files/${pdf.id}/preview?pages=4&w=600&h=800`, new Blob([png], { type: 'image/jpeg' }));
+check(r.status === 200 && r.body.file.pages === 4 && r.body.file.width === 600, 'its first page, drawn by the app, is kept as its preview', JSON.stringify(r.body));
+r = await call(b, 'POST', `/api/files/${file.id}/preview`, new Blob([png], { type: 'image/jpeg' }));
+check(r.status === 400, 'only PDFs take a preview');
+r = await call(b, 'POST', '/api/cards/delete', { ids: [(await call(b, 'GET', '/api/boards/root')).body.cards.find((c) => c.type === 'file').id] });
 r = await call(b, 'GET', '/api/drive');
 check(r.status === 404 && /demo/.test(r.body.error), 'server-only features say "not in the demo"');
 

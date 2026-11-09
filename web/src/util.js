@@ -9,7 +9,7 @@ export function uid() {
 export const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 export const byId = (list) => Object.fromEntries((list || []).map((x) => [x.id, x]));
 
-export const DEFAULT_W = { note: 240, todo: 240, image: 240, link: 260, board: 140, column: 280, drawing: 240, color: 200 };
+export const DEFAULT_W = { note: 240, todo: 240, image: 240, link: 260, board: 140, column: 280, drawing: 240, color: 200, file: 220 };
 
 export const COLORS = [
   { id: null, label: 'None' },

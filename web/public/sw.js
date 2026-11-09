@@ -64,5 +64,7 @@ self.addEventListener('fetch', (e) => {
     );
     return;
   }
-  if (SHELL.includes(url.pathname)) e.respondWith(cacheFirst(SHELL_CACHE, req));
+  // The app's startup files, plus parts loaded on demand (the PDF reader, pdf.js and its worker,
+  // fonts some PDFs need): kept after their first use, so a PDF opens offline the next time too.
+  if (SHELL.includes(url.pathname) || url.pathname.startsWith('/assets/') || url.pathname.startsWith('/pdfjs/')) e.respondWith(cacheFirst(SHELL_CACHE, req));
 });
