@@ -290,7 +290,10 @@ async function storeUpload(f, { utf8Name = false } = {}) {
   const ext = safeExt(name, f.mimetype);
   const dest = path.join(DIRS.files, id + ext);
   fs.renameSync(f.path, dest);
-  const hash = crypto.createHash('sha256').update(fs.readFileSync(dest)).digest('hex');
+  // Read in chunks: a 2 GB video must not be loaded into memory whole.
+  const hasher = crypto.createHash('sha256');
+  for await (const chunk of fs.createReadStream(dest, { highWaterMark: 4 * 1024 * 1024 })) hasher.update(chunk);
+  const hash = hasher.digest('hex');
   const row = { id, name, mime: f.mimetype, ext, size: f.size, width: null, height: null, sha256: hash, display_ext: null, created_at: Date.now() };
 
   const isHeic = /^\.(heic|heif)$/.test(ext) || /heic|heif/.test(f.mimetype);
@@ -500,12 +503,15 @@ app.get('/files/:id/thumb', (req, res) => {
   res.sendFile(thumbPath(f.id), { headers: IMMUTABLE });
 });
 
-// A PDF's preview: the browser draws the first page with pdf.js (the server has no PDF renderer) and
-// sends it here as a picture. It becomes the file's thumbnail, so cards show it like any image.
+// A PDF's or video's preview: the browser draws the first page (pdf.js) or a frame (a <video>) and
+// sends it here as a picture; the server has no PDF or video decoder. It becomes the file's
+// thumbnail, so cards show it like any image.
 const isPdf = (f) => f.ext === '.pdf' || f.mime === 'application/pdf';
+const isVideo = (f) => /^video\//.test(f.mime || '') || /^\.(mp4|m4v|mov|webm|ogv)$/i.test(f.ext || '');
+const browserPreview = (f) => isPdf(f) || isVideo(f);
 app.post('/api/files/:id/preview', express.raw({ type: 'image/*', limit: '10mb' }), async (req, res) => {
   const f = fileOr404(req.params.id);
-  if (!isPdf(f)) throw new HttpError(400, 'Only PDFs take a preview');
+  if (!browserPreview(f)) throw new HttpError(400, 'Only PDFs and videos take a preview');
   if (!Buffer.isBuffer(req.body) || !req.body.length) throw new HttpError(400, 'Send the preview as an image body');
   let meta;
   try {
@@ -515,8 +521,10 @@ app.post('/api/files/:id/preview', express.raw({ type: 'image/*', limit: '10mb' 
     throw new HttpError(415, `Can't read the preview: ${e.message}`);
   }
   for (const p of [miniPath(f.id), microPath(f.id)]) fs.rmSync(p, { force: true });
-  const pages = Math.max(1, Math.min(100000, Math.round(Number(req.query.pages)) || 1));
-  store.setFilePreview(f.id, { width: meta.width, height: meta.height, color: await mainColor(thumbPath(f.id)), pages });
+  const pages = isPdf(f) ? Math.max(1, Math.min(100000, Math.round(Number(req.query.pages)) || 1)) : null;
+  const d = Number(req.query.duration);
+  const duration = isVideo(f) && Number.isFinite(d) && d > 0 ? Math.min(d, 1e6) : null;
+  store.setFilePreview(f.id, { width: meta.width, height: meta.height, color: await mainColor(thumbPath(f.id)), pages, duration });
   res.json({ file: store.getFile(f.id) });
 });
 
@@ -873,13 +881,13 @@ async function rebuildMissingThumbs() {
     }
   }
   if (n) log(`Rebuilt ${n} missing thumbnail(s)`);
-  // A PDF's preview comes from a browser: forget a lost one so the next browser to show it draws it again.
+  // A PDF's or video's preview comes from a browser: forget a lost one so the next browser to show it draws it again.
   for (const f of store.allFiles()) {
-    if (isPdf(f) && f.width && !fs.existsSync(thumbPath(f.id))) store.setFilePreview(f.id, { width: null, height: null, color: null, pages: f.pages });
+    if (browserPreview(f) && f.width && !fs.existsSync(thumbPath(f.id))) store.setFilePreview(f.id, { width: null, height: null, color: null, pages: f.pages, duration: f.duration });
   }
   // Files uploaded before cut-out detection existed.
   for (const f of store.allFiles()) {
-    if (f.alpha != null || isPdf(f) || !fs.existsSync(thumbPath(f.id))) continue; // a PDF's page preview is never a cut-out
+    if (f.alpha != null || browserPreview(f) || !fs.existsSync(thumbPath(f.id))) continue; // a page or video frame is never a cut-out
     try {
       const src = fs.existsSync(displayPath(f)) ? displayPath(f) : thumbPath(f.id);
       store.setFileAlpha(f.id, await hasTransparency(await sharp(src).metadata(), thumbPath(f.id)));

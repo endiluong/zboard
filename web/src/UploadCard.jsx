@@ -40,7 +40,7 @@ export default function UploadCard({ u, onCancel, onFailedTap, onRemove }) {
     </span>
   ) : (
     <span className="upl-doc">
-      <Icon name={u.kind === 'image' ? 'image' : 'file'} size={34} />
+      <Icon name={u.kind === 'image' ? 'image' : u.kind === 'video' ? 'play' : 'file'} size={34} />
       <b>{ext}</b>
     </span>
   );
