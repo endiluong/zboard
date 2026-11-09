@@ -70,9 +70,16 @@ export async function createBackend({ sqlite3, storage, images }) {
       'POST',
       /^\/api\/upload$/,
       async (m, q, body, req) => {
-        const form = await req.formData();
         const files = [];
-        for (const f of form.getAll('file')) if (f && typeof f === 'object') files.push(await storeUpload(f, f.name));
+        const ct = req.headers.get('content-type') || '';
+        if (ct.startsWith('multipart/form-data')) {
+          for (const f of (await req.formData()).getAll('file')) if (f && typeof f === 'object') files.push(await storeUpload(f, f.name));
+        } else {
+          // The demo app sends one file's bytes per request (uploadFiles in src/api.js): Safari
+          // can't read files in FormData inside a service worker.
+          const blob = new Blob([await req.arrayBuffer()], { type: ct.split(';')[0].trim() || 'application/octet-stream' });
+          if (blob.size) files.push(await storeUpload(blob, q.get('name') || ''));
+        }
         if (!files.length) throw new HttpError(400, 'No file sent');
         return json({ file: files[0], files }, 201);
       },

@@ -32,6 +32,7 @@ const ORIGIN = 'https://endiluong.github.io';
 const call = async (b, method, p, body) => {
   const init = { method };
   if (body instanceof FormData) init.body = body;
+  else if (body instanceof Blob) Object.assign(init, { body: await body.arrayBuffer(), headers: { 'content-type': body.type } });
   else if (body !== undefined) Object.assign(init, { body: JSON.stringify(body), headers: { 'content-type': 'application/json' } });
   const res = await b.handle(new Request(ORIGIN + p, init));
   const ct = res.headers.get('content-type') || '';
@@ -79,6 +80,8 @@ fd.append('file', new Blob([png], { type: 'image/png' }), 'dot.png');
 r = await call(b, 'POST', '/api/upload', fd);
 const file = r.body.file;
 check(r.status === 201 && file?.name === 'dot.png' && file.size === png.length, 'pictures upload', JSON.stringify(r.body));
+r = await call(b, 'POST', '/api/upload?name=IMG%200001.png', new Blob([png], { type: 'image/png' }));
+check(r.status === 201 && r.body.file?.name === 'IMG 0001.png' && r.body.file.mime === 'image/png' && r.body.file.size === png.length, 'pictures sent as plain bytes upload too (Safari)', JSON.stringify(r.body));
 r = await call(b, 'GET', `/files/${file.id}/thumb`);
 check(r.status === 200 && r.body.size === png.length, 'and are served back (the original when there is no preview)');
 r = await call(b, 'GET', '/api/drive');
