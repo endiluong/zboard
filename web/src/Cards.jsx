@@ -558,7 +558,10 @@ export const CardView = memo(function CardView(props) {
     mounted.current = true;
   }, [props.lowRes, props.settledS]);
   const bg = isHex(card.color) && card.type !== 'board' ? { background: card.color, color: inkFor(card.color) === '#ffffff' ? '#f5f5f4' : undefined } : null;
-  const style = inColumn ? bg || undefined : { left: card.x, top: card.y, width: card.w || DEFAULT_W[card.type], zIndex: card.z, ...bg };
+  // A card showing its handles comes to the front while selected: the handles live inside the card,
+  // so they could never be drawn above a neighbour that sits higher in the stack.
+  const withHandles = selected && !inColumn && !editing;
+  const style = inColumn ? bg || undefined : { left: card.x, top: card.y, width: card.w || DEFAULT_W[card.type], zIndex: withHandles ? 1e6 + (card.z || 0) : card.z, ...bg };
   const cutout = card.type === 'image' && props.file?.alpha === 1; // see-through PNG: no card frame
   const cls = ['card', `card-${card.type}`, cutout && 'cutout', selected && 'selected', editing && 'editing', dragging && 'dragging', cut && 'cut', hidden && (card.type === 'image' ? 'ink-hide' : 'ink-editing'), card.color && !isHex(card.color) && `c-${card.color}`, isHex(card.color) && 'has-bg', inColumn && 'in-column']
     .filter(Boolean)
@@ -569,7 +572,7 @@ export const CardView = memo(function CardView(props) {
       {card.data?.strip && card.type !== 'board' && <div className="card-strip" style={{ background: card.data.strip }} />}
       {Body && <Body {...props} lowRes={lowRes} />}
       {card.type !== 'image' && card.type !== 'column' && <LabelChips labels={card.data.labels} />}
-      {selected && !inColumn && !editing && (
+      {withHandles && (
         <>
           {/* Touch screens: an Arrow button above the card (finger-sized, keeps the corners clear) and a
               circle on the bottom-right corner to resize by pulling it. Moving is hold-and-drag on the
