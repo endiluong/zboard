@@ -243,7 +243,7 @@ from sleeping while plugged in: `powercfg /change standby-timeout-ac 0`. (On nat
 | `BACKUP_AUTO` | – | `off` stops the automatic full backup (only **Back up now** then). How often it runs is set in **Menu → Backup & Restore**. `BACKUP_CRON` is no longer used. |
 | `CLEANUP_CRON` | `0 4 1 * *` | When unused files are checked (1st of each month, 04:00). A run missed while ZBoard was off happens at the next start. `off` disables it. |
 | `CLEANUP_AFTER_DAYS` | `30` | A picture no card or saved item uses is removed (original, previews, local backup copy, Drive copy) once unused this long **and** older than every kept backup. |
-| `MAX_UPLOAD_MB` | `50` | Largest upload. |
+| `MAX_UPLOAD_MB` | `50` | Largest upload, in MB. Files over 5 MB go up in resumable pieces, so videos of 1–2 GB work (set `2048`). The server needs about twice the file's size free while one finishes. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | – | Google Drive backup, see below. |
 | `GOOGLE_BACKUP_PASSPHRASE` | – | Optional: encrypt everything before it goes to Drive. Needed to restore. |
 

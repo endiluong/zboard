@@ -8,6 +8,7 @@ import { rotatedImgStyle } from './ImageEditor.jsx';
 import { inkFor } from './Cover.jsx';
 import { colorName } from './colorNames.js';
 import { isPdf } from './pdf.js';
+import { formatDuration, isVideo } from './video.js';
 import { formatBytes } from './Menu.jsx';
 
 const TOUCH = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
@@ -303,29 +304,41 @@ function FileBody({ card, editing, selected, inColumn, file, actions, lowRes }) 
   const d = card.data;
   const fileId = d.fileId;
   const pdf = isPdf(file);
+  const video = !pdf && isVideo(file);
   useEffect(() => {
     if (fileId && !file) actions.ensureFile(fileId);
   }, [fileId, file, actions]);
   useEffect(() => {
-    if (pdf && !file.width) actions.ensurePdfPreview(fileId);
-  }, [pdf, file?.width, fileId, actions]);
+    if ((pdf || video) && !file.width) actions.ensurePreview(fileId, video);
+  }, [pdf, video, file?.width, fileId, actions]);
   const ext = (file?.ext || '').replace('.', '').toUpperCase().slice(0, 5) || 'FILE';
-  const facts = [pdf ? (file.pages ? `${file.pages} page${file.pages === 1 ? '' : 's'}` : 'PDF') : ext, file?.size ? formatBytes(file.size) : null].filter(Boolean).join(' · ');
+  const kind = pdf ? ' is-pdf' : video ? ' is-video' : '';
+  const facts = [pdf ? (file.pages ? `${file.pages} page${file.pages === 1 ? '' : 's'}` : 'PDF') : video ? formatDuration(file.duration) || 'Video' : ext, file?.size ? formatBytes(file.size) : null]
+    .filter(Boolean)
+    .join(' · ');
   return (
     <>
-      {pdf && file.width ? (
+      {(pdf || video) && file.width ? (
         <div className="img-wrap file-page" style={{ aspectRatio: `${file.width} / ${file.height}`, backgroundColor: file.color || '#ffffff' }}>
           <SafeImg src={`/files/${fileId}/${sizeName(lowRes)}`} alt={file.name || ''} draggable={false} loading="lazy" decoding="async" />
+          {video && (
+            <>
+              <span className="file-play" aria-hidden="true">
+                <Icon name="play" size={22} />
+              </span>
+              {file.duration > 0 && <span className="file-duration">{formatDuration(file.duration)}</span>}
+            </>
+          )}
           <LabelChips labels={d.labels} />
         </div>
       ) : (
-        <div className={'file-tile' + (pdf ? ' is-pdf' : '')}>
+        <div className={'file-tile' + kind}>
           <span className="file-ext">{ext}</span>
           <LabelChips labels={d.labels} />
         </div>
       )}
       <div className="file-meta">
-        <span className={'file-badge' + (pdf ? ' is-pdf' : '')}>{ext}</span>
+        <span className={'file-badge' + kind}>{ext}</span>
         <span className="file-text">
           <span className="file-name">{file?.name || 'File'}</span>
           <span className="file-facts">{facts}</span>

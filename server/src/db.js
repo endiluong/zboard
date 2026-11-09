@@ -247,6 +247,7 @@ export function createStore(file) {
   if (!fileCols.includes('color')) db.exec('ALTER TABLE files ADD COLUMN color TEXT');
   if (!fileCols.includes('unused_since')) db.exec('ALTER TABLE files ADD COLUMN unused_since INTEGER'); // see cleanup.js
   if (!fileCols.includes('pages')) db.exec('ALTER TABLE files ADD COLUMN pages INTEGER'); // PDFs
+  if (!fileCols.includes('duration')) db.exec('ALTER TABLE files ADD COLUMN duration REAL'); // videos, in seconds
   const now = () => Date.now();
 
   if (!db.prepare('SELECT 1 FROM boards WHERE id = ?').get('root')) {
@@ -752,9 +753,10 @@ export function createStore(file) {
     db.prepare(insertSql('files', ['id', 'name', 'mime', 'ext', 'size', 'width', 'height', 'sha256', 'display_ext', 'alpha', 'color', 'created_at'])).run({ alpha: null, color: null, ...f });
   const setFileAlpha = (id, alpha) => db.prepare('UPDATE files SET alpha = ? WHERE id = ?').run(alpha ? 1 : 0, id);
   const setFileColor = (id, color) => db.prepare('UPDATE files SET color = ? WHERE id = ?').run(color, id);
-  // A PDF's first page, drawn by the browser (see web/src/pdf.js): its size and the page count.
-  const setFilePreview = (id, { width, height, color, pages }) =>
-    db.prepare('UPDATE files SET width = ?, height = ?, color = ?, pages = ? WHERE id = ?').run(width, height, color, pages, id);
+  // A PDF's first page or a video's frame, drawn by the browser (web/src/pdf.js, video.js): its size,
+  // and the page count or the length.
+  const setFilePreview = (id, { width, height, color, pages = null, duration = null }) =>
+    db.prepare('UPDATE files SET width = ?, height = ?, color = ?, pages = ?, duration = ? WHERE id = ?').run(width, height, color, pages, duration, id);
   const getFile = (id) => db.prepare('SELECT * FROM files WHERE id = ?').get(id) ?? null;
 
   return {

@@ -15,6 +15,8 @@ import SavedPanel, { CLIP_DRAG_TYPE } from './SavedPanel.jsx';
 import { cachedBoard, fetchBoard, prefetchBoard, remember } from './boardCache.js';
 import { Icon } from './icons.jsx';
 import { PDF_SUPPORTED, fileUrl, isPdf, makePdfPreview } from './pdf.js';
+import { isVideo, makeVideoPreview } from './video.js';
+import VideoPlayer from './VideoPlayer.jsx';
 import { formatBytes } from './Menu.jsx';
 import { DEMO } from './demo.js';
 import UploadCard from './UploadCard.jsx';
@@ -114,6 +116,7 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
   const [ghost, setGhost] = useState(null);
   const [lightbox, setLightbox] = useState(null);
   const [reader, setReader] = useState(null); // fileId of the PDF open in the reader
+  const [player, setPlayer] = useState(null); // fileId of the video playing
   const [uploads, setUploads] = useState([]); // files on their way up, shown as placeholder cards
   const uploadAborts = useRef(new Map());
   const [toast, setToast] = useState(null);
@@ -659,8 +662,10 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
   // ---------- adding content ----------
   // A PDF's first page: drawn from the file just picked while it is small enough to hold in memory
   // (fast, nothing downloaded again); a bigger one is read from the server in pieces instead.
-  const previewPdf = useCallback((f, picked) => {
-    makePdfPreview(f.id, picked && picked.size <= PREVIEW_FROM_MEMORY ? picked : undefined).then((nf) => nf && setFiles((m) => ({ ...m, [nf.id]: nf })));
+  // A video's frame: always from the file just picked (the browser reads it from disk, whatever its size).
+  const previewFile = useCallback((f, picked) => {
+    const job = isPdf(f) ? makePdfPreview(f.id, picked && picked.size <= PREVIEW_FROM_MEMORY ? picked : undefined) : isVideo(f) ? makeVideoPreview(f.id, picked) : null;
+    job?.then((nf) => nf && setFiles((m) => ({ ...m, [nf.id]: nf })));
   }, []);
 
   // Pictures become image cards; any other file (a PDF, a ZIP…) a file card. Files too big for the
@@ -695,7 +700,7 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
           setFiles((f) => ({ ...f, ...byId(made) }));
           setToast(null);
           await createCards(made.map((f, i) => cardFor(f, { column_id: at.column_id, sort: (at.sort ?? 0) + i * 0.001 })));
-          made.forEach((f, i) => isPdf(f) && previewPdf(f, all[i]));
+          made.forEach((f, i) => previewFile(f, all[i]));
         } catch (e) {
           notify(e);
         }
@@ -713,7 +718,7 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
           key: uid(),
           file,
           name: file.name || 'pasted.png',
-          kind: isImageFile(file) ? 'image' : isPdf({ name: file.name, mime: file.type }) ? 'pdf' : 'file',
+          kind: isImageFile(file) ? 'image' : isPdf({ name: file.name, mime: file.type }) ? 'pdf' : isVideo({ name: file.name, mime: file.type }) ? 'video' : 'file',
           x,
           y,
           sent: 0,
@@ -731,7 +736,7 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
           setFiles((m) => ({ ...m, [f.id]: f }));
           drop(job.key);
           await createCards([cardFor(f, { x: job.x, y: job.y })]);
-          if (isPdf(f)) previewPdf(f, job.file);
+          previewFile(f, job.file);
         } catch (e) {
           if (e.cancelled) return drop(job.key);
           patch(job.key, { error: e.message });
@@ -747,7 +752,7 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
         while (queue.length) await run(queue.shift());
       }));
     },
-    [createCards, notify, previewPdf, boardId]
+    [createCards, notify, previewFile, boardId]
   );
 
   // Big uploads (uploads.js): this board's are shown as placeholders; a finished one becomes its card.
@@ -759,13 +764,13 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
       setFiles((m) => ({ ...m, [file.id]: file }));
       if (card.board_id === boardId) applyCards([card]);
       if (movedHome) notify(`${file.name}: its board was deleted, so it was put on Home.`);
-      if (isPdf(file)) previewPdf(file, picked);
+      previewFile(file, picked);
     });
     return () => {
       offJobs();
       offDone();
     };
-  }, [boardId, applyCards, notify, previewPdf]);
+  }, [boardId, applyCards, notify, previewFile]);
   const repickFor = useRef(null);
   const repickInput = useRef(null);
 
@@ -974,8 +979,9 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
         const r = await api('GET', `/api/files/${fileId}/info`).catch(() => null);
         if (r) setFiles((f) => ({ ...f, [fileId]: r.file }));
       },
-      ensurePdfPreview: async (fileId) => {
-        const nf = await makePdfPreview(fileId);
+      // A PDF or video that has no picture yet (added another way): this browser draws it.
+      ensurePreview: async (fileId, video) => {
+        const nf = await (video ? makeVideoPreview(fileId) : makePdfPreview(fileId));
         if (nf) setFiles((f) => ({ ...f, [fileId]: nf }));
       },
     }),
@@ -1021,9 +1027,14 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
       // so nothing flashes first.
       if (isPdf(f) && PDF_SUPPORTED) return setReader(c.data.fileId);
       if (isPdf(f)) return void window.open(fileUrl(c.data.fileId), '_blank', 'noopener');
+      if (isVideo(f)) return setPlayer(c.data.fileId);
+      // Anything else downloads. target=_blank: in the home-screen app on an iPhone the file opens
+      // over the app (with Done) instead of replacing it with no way back; computers just download.
       const a = document.createElement('a');
       a.href = fileUrl(c.data.fileId);
       a.download = f?.name || 'file';
+      a.target = '_blank';
+      a.rel = 'noopener';
       a.click();
     }
   }, [openDrawing, onInfo]);
@@ -1808,7 +1819,7 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
     const down = (e) => {
       if (S.current.drawing) return; // the drawing layer has its own keys
       const typing = e.target.closest?.('input, textarea, [contenteditable="true"]');
-      if (reader) return; // the reader has its own keys
+      if (reader || player) return; // the reader and the player have their own keys
       if (e.key === 'Escape') {
         if (lightbox) return setLightbox(null);
         if (typing) {
@@ -1921,7 +1932,7 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
       window.removeEventListener('copy', copyOrCut);
       window.removeEventListener('cut', copyOrCut);
     };
-  }, [lightbox, reader, undo, duplicate, deleteArrow, deleteCards, startEdit, zoomCenter, fitAll, selectAll, copySelection, pasteClip, pointerWorld, addImages, addLink, addText]);
+  }, [lightbox, reader, player, undo, duplicate, deleteArrow, deleteCards, startEdit, zoomCenter, fitAll, selectAll, copySelection, pasteClip, pointerWorld, addImages, addLink, addText]);
 
   const onDragOver = (e) => {
     const types = [...e.dataTransfer.types];
@@ -2547,6 +2558,8 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
           <PdfReader file={files[reader]} onClose={() => setReader(null)} />
         </Suspense>
       )}
+
+      {player && files[player] && <VideoPlayer file={files[player]} onClose={() => setPlayer(null)} />}
 
       {lightbox && (
         <div className="lightbox" onClick={() => setLightbox(null)}>

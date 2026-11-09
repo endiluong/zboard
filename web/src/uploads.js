@@ -8,6 +8,7 @@
 // their own jobs as placeholder cards (subscribe) and place the card when one finishes (onFinished).
 import { api, clientId } from './api.js';
 import { isPdf } from './pdf.js';
+import { isVideo } from './video.js';
 
 export const PIECE = 5 * 1024 * 1024; // same as the server's
 // An unfinished upload this browser knows nothing about (its copy was cleared, or it belongs to another
@@ -51,7 +52,7 @@ const cancelled = new Set();
 const listeners = new Set();
 const finishers = new Set();
 
-const kindOf = (name, mime) => (/^image\//.test(mime || '') ? 'image' : isPdf({ name, mime }) ? 'pdf' : 'file');
+const kindOf = (name, mime) => (/^image\//.test(mime || '') ? 'image' : isPdf({ name, mime }) ? 'pdf' : isVideo({ name, mime }) ? 'video' : 'file');
 const emit = () => {
   const list = [...jobs.values()];
   for (const fn of listeners) fn(list);
