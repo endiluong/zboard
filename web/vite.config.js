@@ -20,7 +20,9 @@ function serviceWorker() {
         .filter((f) => /\.(js|css)$/.test(f))
         .map((f) => '/' + f)
         .sort();
-      const version = createHash('sha1').update(shell.join('\n')).digest('hex').slice(0, 12);
+      // index.html too: the boot intro lives in it, and the worker serves the page from its cache.
+      const html = bundle['index.html']?.source ?? '';
+      const version = createHash('sha1').update(shell.join('\n')).update(String(html)).digest('hex').slice(0, 12);
       const file = path.join(outDir, 'sw.js');
       const src = fs.readFileSync(file, 'utf8').replace('__ZB_VERSION__', version).replace('/*__ZB_SHELL__*/ []', JSON.stringify(shell));
       fs.writeFileSync(file, src);

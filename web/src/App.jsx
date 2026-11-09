@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, setUnauthorizedHandler } from './api.js';
 import { DEMO, REPO_URL } from './demo.js';
 import Board from './Board.jsx';
+import { bootDone } from './boot.js';
 import { Icon } from './icons.jsx';
 import Menu from './Menu.jsx';
 import Search from './Search.jsx';
@@ -14,6 +15,7 @@ function parseHash() {
 }
 
 function Login({ onDone }) {
+  useEffect(bootDone, []);
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);

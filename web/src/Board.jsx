@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { api, openEvents, uploadFiles } from './api.js';
+import { bootDone } from './boot.js';
 import { CardView, SafeImg, youtubeId } from './Cards.jsx';
 import ContextMenu from './ContextMenu.jsx';
 import CoverPicker from './Cover.jsx';
@@ -78,6 +79,9 @@ export default function Board({ boardId, focus, onInfo, savedOpen, onCloseSaved,
   const [arrows, setArrows] = useState(() => byId(cached?.arrows));
   const [files, setFiles] = useState(() => cached?.files || {});
   const [loaded, setLoaded] = useState(!!cached);
+  useEffect(() => {
+    if (loaded) bootDone(); // the first board is on screen: the boot intro can go
+  }, [loaded]);
   const [panelHold, setPanelHold] = useState(false); // see the touch tap handler
   const panelHoldTimer = useRef(0);
   const [view, setView] = useState(() => loadView(boardId) || { x: 80, y: 40, s: 1 });

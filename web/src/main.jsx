@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
+import { bootDone } from './boot.js';
 import { DEMO } from './demo.js';
 import './styles.css';
 
@@ -19,13 +20,14 @@ if (DEMO) {
   root.render(<div className="splash">ZBoard</div>);
   boot()
     .then(() => root.render(<App />))
-    .catch(() =>
+    .catch(() => {
+      bootDone();
       root.render(
         <div className="splash demo-unsupported">
           <p>The ZBoard demo needs a browser that allows service workers (a private window may not).</p>
         </div>
-      )
-    );
+      );
+    });
 } else {
   root.render(<App />);
 }

@@ -48,15 +48,19 @@ self.addEventListener('fetch', (e) => {
     return;
   }
   if (url.pathname.startsWith('/files/')) return;
-  // Pages: network first so a new build shows up, the cached shell when offline.
+  // Pages: the shell this worker installed opens at once (no wait on a slow network before the boot
+  // intro can draw). It always matches this build's scripts; a new build brings a new worker, which
+  // the browser picks up in the background and uses from the next start.
   if (req.mode === 'navigate') {
     e.respondWith(
-      fetch(req)
-        .then((res) => {
-          if (res.ok) caches.open(SHELL_CACHE).then((c) => c.put('/', res.clone()));
-          return res;
-        })
-        .catch(() => caches.match('/', { cacheName: SHELL_CACHE }))
+      caches.match('/', { cacheName: SHELL_CACHE }).then(
+        (hit) =>
+          hit ||
+          fetch(req).then((res) => {
+            if (res.ok) caches.open(SHELL_CACHE).then((c) => c.put('/', res.clone()));
+            return res;
+          })
+      )
     );
     return;
   }

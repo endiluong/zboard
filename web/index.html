@@ -12,8 +12,125 @@
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <title>ZBoard</title>
+    <!-- The boot intro: drawn by the browser as soon as this page arrives, before any script loads,
+         and faded out by src/boot.js once the first board (or the sign-in page) is on screen. -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #f4f3ef;
+      }
+      #boot {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        background: #f4f3ef;
+        background-image: radial-gradient(#d6d3cb 1.2px, transparent 1.2px);
+        background-size: 22px 22px;
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        transition: opacity 0.35s ease, transform 0.35s ease;
+      }
+      #boot.boot-out {
+        opacity: 0;
+        transform: scale(1.04);
+        pointer-events: none;
+      }
+      #boot svg {
+        width: 96px;
+        height: 96px;
+        border-radius: 22px;
+        box-shadow: 0 10px 30px rgba(47, 111, 222, 0.28);
+        animation: boot-pop 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+      #boot .t {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: boot-tile 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+      #boot .t1 { animation-delay: 0.25s; }
+      #boot .t2 { animation-delay: 0.37s; }
+      #boot .t3 { animation-delay: 0.49s; }
+      #boot .t4 { animation-delay: 0.61s; }
+      /* Apple-style: the name and the line under it rise from behind an invisible edge, unblurring as
+         they come, and the name's colours drift slowly while the app loads. */
+      #boot .boot-line {
+        overflow: hidden;
+        padding: 0.06em 0.1em 0.12em;
+      }
+      #boot .boot-name span {
+        display: block;
+        font-family: -apple-system, 'SF Pro Display', BlinkMacSystemFont, system-ui, 'Segoe UI', sans-serif;
+        font-size: 46px;
+        font-weight: 700;
+        letter-spacing: -0.035em;
+        line-height: 1.05;
+        color: #2f6fde;
+        background: linear-gradient(90deg, #2f6fde, #7c5cf5, #e5508e, #f59e0b, #7c5cf5, #2f6fde);
+        background-size: 300% 100%;
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: boot-rise-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.55s both, boot-hue 6s linear 0.55s infinite;
+      }
+      #boot .boot-tag {
+        margin-top: -18px;
+        padding-top: 8px; /* room for the wave above the letters */
+      }
+      #boot .boot-tag span {
+        display: block;
+        font-family: -apple-system, 'SF Pro Text', BlinkMacSystemFont, system-ui, 'Segoe UI', sans-serif;
+        font-size: 17px;
+        font-weight: 500;
+        letter-spacing: -0.01em;
+        color: #6b6860;
+        animation: boot-rise-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.9s both;
+      }
+      /* Still loading: a wave runs through the letters every 2 s. */
+      #boot .boot-tag i {
+        display: inline-block;
+        font-style: normal;
+        animation: boot-wave 2s ease-in-out calc(1.9s + var(--i) * 0.08s) infinite;
+      }
+      @keyframes boot-wave {
+        0%, 30%, 100% { transform: none; }
+        12% { transform: translateY(-6px); color: #2f6fde; }
+      }
+      @keyframes boot-rise-in {
+        from { transform: translateY(105%); opacity: 0; filter: blur(8px); }
+        to { transform: none; opacity: 1; filter: none; }
+      }
+      @keyframes boot-hue {
+        to { background-position: 300% 0; }
+      }
+      @keyframes boot-pop {
+        from { transform: scale(0.7); opacity: 0; }
+        to { transform: none; opacity: 1; }
+      }
+      @keyframes boot-tile {
+        from { transform: scale(0.6); opacity: 0; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #boot *, #boot { animation: none !important; transition: none !important; }
+      }
+    </style>
   </head>
   <body>
+    <div id="boot" role="status" aria-label="ZBoard is loading">
+      <svg viewBox="0 0 512 512" aria-hidden="true">
+        <rect width="512" height="512" rx="112" fill="#2f6fde" />
+        <rect class="t t1" x="104" y="120" width="136" height="168" rx="20" fill="#fff" />
+        <rect class="t t2" x="272" y="120" width="136" height="104" rx="20" fill="#fff" opacity="0.85" />
+        <rect class="t t3" x="272" y="248" width="136" height="144" rx="20" fill="#fff" />
+        <rect class="t t4" x="104" y="312" width="136" height="80" rx="20" fill="#fff" opacity="0.85" />
+      </svg>
+      <div class="boot-line boot-name"><span>ZBoard</span></div>
+      <div class="boot-line boot-tag"><span aria-label="Loading"><i style="--i: 0">L</i><i style="--i: 1">o</i><i style="--i: 2">a</i><i style="--i: 3">d</i><i style="--i: 4">i</i><i style="--i: 5">n</i><i style="--i: 6">g</i></span></div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
