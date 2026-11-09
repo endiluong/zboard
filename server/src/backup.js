@@ -363,8 +363,15 @@ export function createDrive({ getStore, dataDir, clientId, clientSecret, passphr
     if (!running) schedule(debounceMs);
   }
 
+  // Restore and Disconnect wait for no upload: cutting Drive off (or replacing everything) halfway
+  // through a backup would leave Drive and this server's list of what's on it out of step.
+  const assertNotUploading = () => {
+    if (running) throw new HttpError(409, 'A backup is uploading to Google Drive. Try again when it has finished.');
+  };
+
   async function disconnect() {
     assertNotPaused();
+    assertNotUploading();
     pending = null;
     clearTimeout(timer);
     const refresh = getMeta('drive_refresh_token');
@@ -380,7 +387,7 @@ export function createDrive({ getStore, dataDir, clientId, clientSecret, passphr
   // Download the newest snapshot and every original it lists, then hand over to the server to swap databases.
   async function restore() {
     assertNotPaused();
-    if (running) await running.catch(() => {});
+    assertNotUploading();
     const f = await folders();
     const snaps = await listAll(`${qstr(f.snapshots)} in parents and trashed = false`, 'createdTime desc');
     if (!snaps.length) throw new HttpError(404, 'No ZBoard snapshots found in Google Drive.');

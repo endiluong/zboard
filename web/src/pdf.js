@@ -110,14 +110,17 @@ async function drawFirstPage(src) {
     const viewport = page.getViewport({ scale: Math.min(4, 800 / one.width) });
     const canvas = document.createElement('canvas');
     canvas.width = Math.ceil(viewport.width);
-    canvas.height = Math.ceil(viewport.height);
+    // At most 1.5 × as tall as wide (the card shows no more, see Cards.jsx): a one-page infographic
+    // many screens long is drawn from its top only, sharp, and without a huge canvas (iOS limits them).
+    canvas.height = Math.ceil(Math.min(viewport.height, viewport.width * 1.5));
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     await page.render({ canvas, canvasContext: ctx, viewport }).promise;
     const blob = await new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('No preview'))), 'image/jpeg', 0.85));
+    const { width, height } = canvas;
     canvas.width = canvas.height = 0; // free the memory now (iOS keeps little for canvases)
-    return { blob, width: Math.ceil(viewport.width), height: Math.ceil(viewport.height), pages: doc.numPages };
+    return { blob, width, height, pages: doc.numPages };
   } finally {
     doc.destroy();
   }

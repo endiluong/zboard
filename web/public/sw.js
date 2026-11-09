@@ -42,9 +42,11 @@ self.addEventListener('fetch', (e) => {
   if (url.origin !== self.location.origin) return;
   // Live data always goes to the network.
   if (url.pathname.startsWith('/api/')) return;
-  // Previews (every size) never change for a given id.
+  // Previews (every size) never change for a given id and ?v (a PDF's or video's preview, which a
+  // browser may draw again, carries ?v=<width>x<height>; ?r=, a retry, is left out of the key).
   if (/^\/files\/[^/]+\/(thumb|mini|micro)$/.test(url.pathname)) {
-    e.respondWith(cacheFirst(IMAGE_CACHE, req, url.pathname));
+    const v = url.searchParams.get('v');
+    e.respondWith(cacheFirst(IMAGE_CACHE, req, url.pathname + (v ? '?v=' + v : '')));
     return;
   }
   if (url.pathname.startsWith('/files/')) return;

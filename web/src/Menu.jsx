@@ -156,13 +156,14 @@ function BackupSection({ cleanupBusy, onCleanupBusy }) {
           {d.pending?.error && <div className="error-text">{d.pending.error}</div>}
           {(d.running || busy === 'backup') && <DriveProgress p={d.running ? d.progress : null} label={busy === 'backup' && !d.running ? 'Saving to this PC…' : null} />}
           {paused && <div className="muted drive-paused">Google Drive is paused while unused files are being removed. Restore and Disconnect come back when that has finished.</div>}
+          {!paused && uploading && driveOn && <div className="muted drive-paused">Restore and Disconnect come back when the backup has finished.</div>}
           <div className="menu-buttons one-row">
             <button disabled={!!busy || uploading} onClick={() => act('backup', () => api('POST', '/api/backup'))}>
               {uploading ? 'Backing up…' : 'Back up now'}
             </button>
             {driveOn && (
               <button
-                disabled={!!busy || paused}
+                disabled={!!busy || paused || uploading}
                 aria-label="Restore from Google Drive"
                 data-tip="Restore from Google Drive"
                 onClick={() => window.confirm('Replace everything on this server with the newest Google Drive backup?') && act('restore', () => api('POST', '/api/drive/restore'))}
@@ -171,7 +172,7 @@ function BackupSection({ cleanupBusy, onCleanupBusy }) {
               </button>
             )}
             {driveOn && (
-              <button disabled={!!busy || paused} aria-label="Disconnect Google Drive" data-tip="Disconnect Google Drive" onClick={() => act('disconnect', () => api('POST', '/api/drive/disconnect'))}>
+              <button disabled={!!busy || paused || uploading} aria-label="Disconnect Google Drive" data-tip="Disconnect Google Drive" onClick={() => act('disconnect', () => api('POST', '/api/drive/disconnect'))}>
                 Disconnect <DriveLogo />
               </button>
             )}
