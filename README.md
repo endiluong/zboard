@@ -9,7 +9,7 @@
 <h1 align="center">ZBoard</h1>
 
 <p align="center">
-  <b>Your own visual board for pictures, notes and links.</b><br>
+  <b>Your own visual board for pictures, notes, links, PDFs and videos.</b><br>
   A self-hosted, Milanote-style canvas that runs on your PC and follows you to your phone and tablet.
 </p>
 
@@ -46,6 +46,7 @@
 
 <table>
   <tr><td width="34%">🖼️ <b>Boards full of pictures</b></td><td>Drop in images, notes, to-dos, links, colours and drawings, then arrange them freely. Boards go inside boards, as deep as you like.</td></tr>
+  <tr><td>📄 <b>PDFs and videos too</b></td><td>A PDF shows its first page and opens in a reader that loads page by page. A video shows a frame and its length, and streams instead of downloading, even at 1–2 GB.</td></tr>
   <tr><td>📱 <b>On every screen</b></td><td>The same boards on your PC, phone and tablet, kept in sync live. On a phone it installs like an app, with touch gestures and a camera button.</td></tr>
   <tr><td>🧩 <b>Save from anywhere</b></td><td>The <b>ZBoard Clipper</b> extension puts a Save button on every picture on the web, and you pick the board right there.</td></tr>
   <tr><td>🔒 <b>Yours, at home</b></td><td>One Node process with SQLite on your own machine. No account, no cloud service, nothing shared.</td></tr>
@@ -80,6 +81,33 @@ Pictures, columns, YouTube links that play in place, colour swatches and notes, 
 Select a card and the toolbar switches to what you can do with it: draw on a picture, crop and rotate, caption, colour, labels and more. Click empty board (or **Done**) to switch back.
 
 <img src="docs/screenshots/desktop-actions.jpg" alt="An image card selected; the left toolbar shows Done, Draw on, Edit, Caption, Color, Labels and More" width="100%">
+
+### PDFs and videos
+Drop a PDF or a video on a board like a picture. A PDF card shows its first page and page count; a video card
+shows a frame from it, a ▶ and its length. Big files go up in the background with a progress bar, and carry on
+where they stopped if the page is closed or the connection drops.
+
+<img src="docs/screenshots/desktop-files.jpg" alt="A board with a note, two PDF cards showing their cover pages and page counts, and two video cards with a play button and their length" width="100%">
+
+Open a PDF and it reads like a document: fit to width, zoom, jump to a page. It loads **page by page**: only the
+parts of the file for the pages on screen are fetched, so a 100 MB PDF opens about as fast as a small one, and a
+PDF you opened in the last 7 days opens again without downloading anything. Open a video and it plays full
+screen, **streaming**: only the part being played is downloaded, and jumping ahead fetches just that part.
+
+<table>
+  <tr>
+    <td width="40%"><img src="docs/screenshots/desktop-pdf-reader.jpg" alt="The PDF reader on a computer, showing page 2 of 8 of a painting guide"></td>
+    <td width="40%"><img src="docs/screenshots/desktop-video.jpg" alt="The full-screen video player"></td>
+    <td width="20%"><img src="docs/screenshots/phone-pdf-reader.jpg" alt="The PDF reader on a phone"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>PDF reader</sub></td>
+    <td align="center"><sub>Video player</sub></td>
+    <td align="center"><sub>Reading on a phone</sub></td>
+  </tr>
+</table>
+
+<sub>The files in these pictures were made for this README.</sub>
 
 ### Find anything with Ctrl+K
 Search looks through every board, note, link and to-do, ignores accents, and understands `#tags` and labels.
@@ -143,7 +171,7 @@ flowchart TB
     direction LR
     Server["🏠 <b>Home server</b> · mini PC or WSL2<br/>ZBoard: Node 22 + Express"]
     DB[("SQLite<br/>boards and cards")]
-    Files[("Pictures and files<br/>+ previews")]
+    Files[("Pictures, PDFs, videos<br/>+ previews")]
     Local[("Local backups")]
   end
   Drive[("☁️ Your Google Drive<br/>ZBoard Backup")]
@@ -179,6 +207,18 @@ flowchart TB
   Saved strokes become a drawing card where you drew them; double-click it to draw on it again. Keys in
   drawing mode: P pen, V select, E eraser, Delete removes selected strokes, Ctrl+S saves. Wheel and
   trackpad still pan and zoom.
+- **PDFs**: the card shows page 1 (drawn once by the browser that adds it, then kept on the server) and the
+  page count. The reader (react-pdf, downloaded only the first time a PDF is opened) fits the page to the
+  screen, zooms, jumps to a page and draws only the pages near the screen. It reads the file in parts with
+  range requests, each retried if it stalls, and keeps the parts it read in the browser for 7 days (500 MB
+  at most). Browsers too old for the reader open the PDF in their own viewer.
+- **Videos**: the card shows a frame, ▶ and the length. Playing uses the browser's own player (native
+  controls and picture-in-picture on iPhone) and streams with range requests. MP4 (H.264) plays everywhere;
+  an iPhone's HEVC video may not play in Chrome on Windows, and then it offers to open in a new window.
+- **Uploads**: anything up to `MAX_UPLOAD_MB`. Files over 5 MB go up in checksummed 5 MB pieces that resume
+  after a closed page or a lost connection, sending only what's missing. A failed upload shows a red card;
+  tap it to choose the file again. Unfinished uploads are dropped after 7 days. Other files (ZIP, …) show
+  their type and size and download when opened.
 - **Phone**: touch gestures, camera button, installs from the home screen (PWA). Pictures show the card's
   colour while they load and retry by themselves on a weak connection; previews you've seen are kept on the
   device.

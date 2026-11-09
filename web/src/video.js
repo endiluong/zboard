@@ -7,10 +7,10 @@ import { api } from './api.js';
 export const isVideo = (f) => !!f && (/^video\//.test(f.mime || '') || /\.(mp4|m4v|mov|webm|ogv)$/i.test(f.name || '') || /^\.(mp4|m4v|mov|webm|ogv)$/i.test(f.ext || ''));
 export const videoUrl = (id) => `/files/${id}?original=1`;
 
-// 754 → "12:34", 4000 → "1:06:40".
+// 754 → "12:34", 4000 → "1:06:40". Rounded down, as video players show the length.
 export function formatDuration(s) {
   if (!Number.isFinite(s) || s <= 0) return '';
-  s = Math.round(s);
+  s = Math.floor(s);
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   const sec = String(s % 60).padStart(2, '0');
