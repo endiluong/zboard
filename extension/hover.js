@@ -4,9 +4,11 @@
 (() => {
   if (window.__zboardHover) return;
   window.__zboardHover = true;
-  // Never on ZBoard itself, whatever address it is opened at (localhost, Tailscale, the demo):
-  // its page says so in web/index.html.
-  if (document.querySelector('meta[name="application-name"][content="ZBoard"]')) return;
+  // Never on ZBoard itself, whatever address it is opened at (localhost, Tailscale, the demo): its
+  // page says so in web/index.html. Checked now and again on every hover (onZBoard below), in case
+  // the page only became ZBoard after this script ran.
+  const onZBoard = () => !!document.querySelector('meta[name="application-name"][content="ZBoard"]');
+  if (onZBoard()) return;
 
   const MIN = 120; // smaller images (icons, avatars) get no button
   let enabled = true;
@@ -107,7 +109,7 @@
 
   const usable = (img) => {
     if (!enabled || !(img instanceof HTMLImageElement)) return false;
-    if (server && location.origin === new URL(server).origin) return false; // not on ZBoard itself
+    if (onZBoard() || (server && location.origin === new URL(server).origin)) return false; // not on ZBoard itself
     const r = img.getBoundingClientRect();
     return r.width >= MIN && r.height >= MIN && img.naturalWidth >= MIN && !!(img.currentSrc || img.src);
   };
