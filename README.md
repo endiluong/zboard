@@ -59,20 +59,20 @@
 ### Your boards, at a glance
 Each board gets an icon or emoji cover and shows how many cards it holds. Click one to go inside.
 
-<img src="docs/screenshots/desktop-home.jpg" alt="The Home board with board covers: Effect Painting, Paint Skin, Gundam, Non Metallic Metal, Nurgles and Orc, Goblin, Troll" width="100%">
+<img src="docs/screenshots/desktop-home.jpg" alt="The Home board with board covers: Watercolours, Q3 launch, Garden studio build, Courtyard house, Travel sketchbook, Hiring plan, Kitchen refit and Texture library" width="100%">
 
 ### A canvas for everything
-Pictures, columns, YouTube links that play in place, colour swatches and notes, laid out however you think.
+Pictures, columns, links (YouTube ones play in place), colour swatches, to-dos, drawings and notes, laid out however you think.
 
-<img src="docs/screenshots/desktop-board.jpg" alt="A board with a column of reference photos, painted miniatures, a YouTube link and a colour card" width="100%">
+<img src="docs/screenshots/desktop-board.jpg" alt="A watercolour hobby board with a column of finished sketches, a lake painting, flowers, a to-do list, colour swatches, a link, a PDF and a video" width="100%">
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/desktop-gundam.jpg" alt="A Gundam reference board with a grid of photos and step-by-step guides"></td>
-    <td width="50%"><img src="docs/screenshots/desktop-big-board.jpg" alt="A test board with 1,680 pictures, zoomed out"></td>
+    <td width="50%"><img src="docs/screenshots/desktop-gundam.jpg" alt="A courtyard house board with renders, plans, a section drawing, material swatches, a PDF and a video"></td>
+    <td width="50%"><img src="docs/screenshots/desktop-big-board.jpg" alt="A texture library board with 1,680 pictures, zoomed out"></td>
   </tr>
   <tr>
-    <td align="center"><sub>Reference photos and guides, side by side</sub></td>
+    <td align="center"><sub>Renders, plans and documents, side by side</sub></td>
     <td align="center"><sub>1,680 pictures on one board, still smooth</sub></td>
   </tr>
 </table>
@@ -81,6 +81,36 @@ Pictures, columns, YouTube links that play in place, colour swatches and notes, 
 Select a card and the toolbar switches to what you can do with it: draw on a picture, crop and rotate, caption, colour, labels and more. Click empty board (or **Done**) to switch back.
 
 <img src="docs/screenshots/desktop-actions.jpg" alt="An image card selected; the left toolbar shows Done, Draw on, Edit, Caption, Color, Labels and More" width="100%">
+
+### Move, resize, edit, group and arrange
+Hold a card to pick it up and drag it where you want it. Drag a corner to resize. Crop and rotate a picture without touching the original file. Drop cards into a column to group them, or select several and arrange them in a tidy grid.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/gif-pickup.gif" alt="On a touch screen, holding a card makes it swell and pop up, then it follows the finger"></td>
+    <td width="50%"><img src="docs/screenshots/gif-move.gif" alt="Dragging a picture across the board with the mouse"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Pick up (touch): hold, then drag</sub></td>
+    <td align="center"><sub>Move: drag with the mouse</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/gif-resize.gif" alt="Dragging the corner handle to make a picture bigger"></td>
+    <td width="50%"><img src="docs/screenshots/gif-edit.gif" alt="Cropping and rotating a picture in the editor, then saving"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Resize: drag the corner</sub></td>
+    <td align="center"><sub>Edit a picture: crop and rotate</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/gif-group.gif" alt="Dragging notes into a column so they stack together"></td>
+    <td width="50%"><img src="docs/screenshots/gif-arrange.gif" alt="Selecting six messy pictures and arranging them in a grid"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Group: drop cards into a column</sub></td>
+    <td align="center"><sub>Arrange: select several, tidy into a grid</sub></td>
+  </tr>
+</table>
 
 ### PDFs and videos
 Drop a PDF or a video on a board like a picture. A PDF card shows its first page and page count; a video card
@@ -96,7 +126,7 @@ screen, **streaming**: only the part being played is downloaded, and jumping ahe
 
 <table>
   <tr>
-    <td width="40%"><img src="docs/screenshots/desktop-pdf-reader.jpg" alt="The PDF reader on a computer, showing page 2 of 8 of a painting guide"></td>
+    <td width="40%"><img src="docs/screenshots/desktop-pdf-reader.jpg" alt="The PDF reader on a computer, showing page 3 of 8 of a house design brief"></td>
     <td width="40%"><img src="docs/screenshots/desktop-video.jpg" alt="The full-screen video player"></td>
     <td width="20%"><img src="docs/screenshots/phone-pdf-reader.jpg" alt="The PDF reader on a phone"></td>
   </tr>
@@ -107,12 +137,12 @@ screen, **streaming**: only the part being played is downloaded, and jumping ahe
   </tr>
 </table>
 
-<sub>The files in these pictures were made for this README.</sub>
+<sub>Everything in these screenshots is made-up sample content: the pictures, PDFs and videos were drawn for this README.</sub>
 
 ### Find anything with Ctrl+K
 Search looks through every board, note, link and to-do, ignores accents, and understands `#tags` and labels.
 
-<img src="docs/screenshots/desktop-search.jpg" alt="Search for 'skin' listing a board, a note, a to-do and several YouTube links, with matches highlighted" width="100%">
+<img src="docs/screenshots/desktop-search.jpg" alt="Search for 'sketch' listing a board, a picture, a note, two to-dos and a link, with matches highlighted" width="100%">
 
 ### Phone and tablet
 Install it to your home screen and it opens like an app. One finger pans, two fingers zoom, hold a card to pick it up, and the camera button adds a photo straight to the board.
@@ -139,7 +169,7 @@ With **ZBoard Clipper**, hover a picture and click **Save** in its corner. Pick 
 Backups go to this PC first and then Google Drive. Pictures nothing uses any more are cleaned up only when every kept backup is newer, and the confirmation says exactly what goes and that it can't be undone.
 
 <p align="center">
-  <img src="docs/screenshots/cleanup-confirm.png" alt="Confirmation: Permanently remove 129 unused pictures, 52.2 MB, with previews and where they are deleted from" width="560">
+  <img src="docs/screenshots/cleanup-confirm.png" alt="Confirmation: Permanently remove 60 unused files, 1.8 MB, with previews and where they are deleted from" width="560">
 </p>
 
 ## 🚀 Quick start
