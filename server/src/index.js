@@ -884,6 +884,9 @@ async function rebuildMissingThumbs() {
   // A PDF's or video's preview comes from a browser: forget a lost one so the next browser to show it draws it again.
   for (const f of store.allFiles()) {
     if (browserPreview(f) && f.width && !fs.existsSync(thumbPath(f.id))) store.setFilePreview(f.id, { width: null, height: null, color: null, pages: f.pages, duration: f.duration });
+    // A PDF preview drawn before previews were cut at 1.5 × the width (a very tall page made a thin,
+    // blurry strip): forget it too, so it is drawn again from the top of the page.
+    else if (isPdf(f) && f.width && f.height > f.width * 1.55) store.setFilePreview(f.id, { width: null, height: null, color: null, pages: f.pages });
   }
   // Files uploaded before cut-out detection existed.
   for (const f of store.allFiles()) {

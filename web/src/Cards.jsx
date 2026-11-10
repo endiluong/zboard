@@ -300,6 +300,11 @@ function Caption({ card, editing, selected, inColumn, actions }) {
 
 // Any file that isn't a picture. A PDF shows its first page (drawn once by the browser, see pdf.js)
 // and opens in the reader; other files show their type and download when opened.
+// The tallest a PDF or video card's picture gets, as height ÷ width. A4 (1.41) and US Letter (1.29)
+// pages and portrait phone videos (1.78) show whole; a page taller than that (a one-page infographic,
+// a long scroll) shows its top, so one file can't stretch down the whole board.
+const MAX_TALL = { pdf: 1.5, video: 1.8 };
+
 function FileBody({ card, editing, selected, inColumn, file, actions, lowRes }) {
   const d = card.data;
   const fileId = d.fileId;
@@ -319,8 +324,9 @@ function FileBody({ card, editing, selected, inColumn, file, actions, lowRes }) 
   return (
     <>
       {(pdf || video) && file.width ? (
-        <div className="img-wrap file-page" style={{ aspectRatio: `${file.width} / ${file.height}`, backgroundColor: file.color || '#ffffff' }}>
-          <SafeImg src={`/files/${fileId}/${sizeName(lowRes)}`} alt={file.name || ''} draggable={false} loading="lazy" decoding="async" />
+        <div className="img-wrap file-page" style={{ aspectRatio: `${file.width} / ${Math.min(file.height, file.width * (pdf ? MAX_TALL.pdf : MAX_TALL.video))}`, backgroundColor: file.color || '#ffffff' }}>
+          {/* ?v: a redrawn preview gets a new address, so no cache shows the old one. */}
+          <SafeImg src={`/files/${fileId}/${sizeName(lowRes)}?v=${file.width}x${file.height}`} alt={file.name || ''} draggable={false} loading="lazy" decoding="async" />
           {video && (
             <>
               <span className="file-play" aria-hidden="true">

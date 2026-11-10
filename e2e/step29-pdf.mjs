@@ -3,19 +3,19 @@
 // scroll into view, counts pages, zooms and closes with Escape. A PDF added elsewhere (no preview yet)
 // gets its preview drawn by the first browser that shows it. Other files get a tile with their type.
 // Needs a server on ZB_URL.
-import { api, BASE, check, done, launch, login, sleep } from './lib.mjs';
+import { api, BASE, check, done, launch, login, sleep, solidPng } from './lib.mjs';
 
 // A small real PDF: `pages` pages, each with a big "Page N" in Helvetica (a standard font pdf.js
 // draws from its font files) and a coloured block.
-function makePdf(pages) {
+function makePdf(pages, height = 792) {
   const objs = [];
   const kids = [];
   objs[1] = '<< /Type /Catalog /Pages 2 0 R >>';
   objs[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
   for (let i = 0; i < pages; i++) {
     const pageNo = 4 + i * 2;
-    const content = `0.2 0.45 0.85 rg 72 560 450 160 re f 0 0 0 rg BT /F1 48 Tf 72 460 Td (Page ${i + 1}) Tj ET BT /F1 18 Tf 72 400 Td (ZBoard PDF reader check) Tj ET`;
-    objs[pageNo] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ${pageNo + 1} 0 R >>`;
+    const content = `0.2 0.45 0.85 rg 72 ${height - 232} 450 160 re f 0 0 0 rg BT /F1 48 Tf 72 ${height - 332} Td (Page ${i + 1}) Tj ET BT /F1 18 Tf 72 400 Td (ZBoard PDF reader check) Tj ET`;
+    objs[pageNo] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 ${height}] /Resources << /Font << /F1 3 0 R >> >> /Contents ${pageNo + 1} 0 R >>`;
     objs[pageNo + 1] = `<< /Length ${content.length} >>\nstream\n${content}\nendstream`;
     kids.push(`${pageNo} 0 R`);
   }
@@ -193,6 +193,29 @@ await page.keyboard.press('Escape');
   check(!pdfjsLoads.length, 'and pdf.js is never downloaded', pdfjsLoads.join(' '));
   await win?.close();
   await old.close();
+}
+
+// 5f. A very tall one-page PDF (an infographic 13 × as tall as wide) doesn't stretch down the board:
+// its preview is drawn from the top of the page, at most 1.5 × as tall as wide, and so is the card.
+{
+  const fdT = new FormData();
+  fdT.append('file', new Blob([makePdf(1, 612 * 13)], { type: 'application/pdf' }), 'tall infographic.pdf');
+  const tall = (await (await fetch(BASE + '/api/upload', { method: 'POST', headers: { cookie: api.cookie }, body: fdT })).json()).file;
+  const tallCard = (await api('POST', `/api/boards/${board}/cards`, { cards: [{ type: 'file', x: 1300, y: 80, data: { fileId: tall.id } }] })).cards[0];
+  await page.reload();
+  const sel = `[data-card-id="${tallCard.id}"] .file-page img[data-img="loaded"]`;
+  await page.waitForSelector(sel, { timeout: 30000 }).catch(() => {});
+  const ti = (await api('GET', `/api/files/${tall.id}/info`)).file;
+  check(ti.width > 0 && ti.height <= ti.width * 1.5 + 1, 'a very tall page gets a preview of its top, at most 1.5 × as tall as wide', `${ti.width}×${ti.height}`);
+  const box = await page.locator(`[data-card-id="${tallCard.id}"] .file-page`).boundingBox();
+  check(box && box.height <= box.width * 1.5 + 2, 'and its card stays that size on the board', box && `${box.width.toFixed(0)}×${box.height.toFixed(0)}`);
+  // A preview drawn the old way (a thin strip of the whole page) is shown cut to the same shape.
+  const old = await fetch(`${BASE}/api/files/${tall.id}/preview?pages=1`, { method: 'POST', headers: { cookie: api.cookie, 'content-type': 'image/png' }, body: solidPng(60, 780, [200, 60, 60]) });
+  check(old.ok, 'an old-style tall preview is accepted (as one drawn before this change)');
+  await page.reload();
+  await page.waitForSelector(sel, { timeout: 30000 }).catch(() => {});
+  const box2 = await page.locator(`[data-card-id="${tallCard.id}"] .file-page`).boundingBox();
+  check(box2 && box2.height <= box2.width * 1.5 + 2, 'an old tall preview is shown cut to the same shape', box2 && `${box2.width.toFixed(0)}×${box2.height.toFixed(0)}`);
 }
 
 // 6. Startup cache leaves pdf.js out.

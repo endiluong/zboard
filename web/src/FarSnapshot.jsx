@@ -99,8 +99,17 @@ export default function FarSnapshot({ active, scale, worldRef, rects, cards, fil
         const wx = r.x + (wrap.offsetParent === el ? wrap.offsetLeft : 0);
         const wy = r.y + (wrap.offsetParent === el ? wrap.offsetTop : 0);
         if (img.complete && img.naturalWidth) {
+          // Like object-fit: cover, so a picture taller than its frame (a capped PDF page) is cut, not
+          // squashed; PDF and video pages keep their top (object-position: top in styles.css).
+          const fw = wrap.offsetWidth;
+          const fh = wrap.offsetHeight;
+          const k = Math.max(fw / img.naturalWidth, fh / img.naturalHeight);
+          const sw = fw / k;
+          const sh = fh / k;
+          const sx = (img.naturalWidth - sw) / 2;
+          const sy = wrap.classList.contains('file-page') ? 0 : (img.naturalHeight - sh) / 2;
           try {
-            g.drawImage(img, wx, wy, wrap.offsetWidth, wrap.offsetHeight);
+            g.drawImage(img, sx, sy, sw, sh, wx, wy, fw, fh);
           } catch {}
         } else if (file?.color) {
           g.fillStyle = file.color;
